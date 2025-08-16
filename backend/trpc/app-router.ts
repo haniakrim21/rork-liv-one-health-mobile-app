@@ -4,6 +4,7 @@ import requestOtp from "@/backend/trpc/routes/auth/request-otp/route";
 import verifyOtp from "@/backend/trpc/routes/auth/verify-otp/route";
 import startAbsher from "@/backend/trpc/routes/auth/start-absher/route";
 import verifyAbsher from "@/backend/trpc/routes/auth/verify-absher/route";
+import getStats from "@/backend/trpc/routes/dashboard/get-stats/route";
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
@@ -14,6 +15,9 @@ export const appRouter = createTRPCRouter({
     verifyOtp,
     startAbsher,
     verifyAbsher,
+  }),
+  dashboard: createTRPCRouter({
+    getStats,
   }),
 });
 
