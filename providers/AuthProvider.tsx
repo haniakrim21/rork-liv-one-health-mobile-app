@@ -10,6 +10,7 @@ export type UserProfile = {
   email?: string;
   birthDate?: string;
   gender?: "male" | "female" | "other";
+  avatarUrl?: string;
 };
 
 export type AuthState = {

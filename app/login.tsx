@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Stack, useRouter } from "expo-router";
 import { View, Text, StyleSheet, TextInput, Platform, Animated, Alert } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { ShieldCheck, PhoneCall, CheckCircle2, RotateCcw } from "lucide-react-native";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
@@ -9,6 +10,7 @@ import { useAuth } from "@/providers/AuthProvider";
 
 const PHONE_PREFIX = "+966" as const;
 const RESEND_COOLDOWN_SECONDS = 45 as const;
+const CODE_EXPIRES_SECONDS_FALLBACK = 300 as const;
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -21,6 +23,7 @@ export default function LoginScreen() {
   const [stage, setStage] = useState<"enter-phone" | "enter-code">("enter-phone");
   const [cooldown, setCooldown] = useState<number>(0);
   const [touched, setTouched] = useState<{ phone: boolean; code: boolean }>({ phone: false, code: false });
+  const [expiresIn, setExpiresIn] = useState<number>(0);
 
   const mount = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -30,15 +33,20 @@ export default function LoginScreen() {
   const requestOtpMutation = trpc.auth.requestOtp.useMutation();
   const verifyOtpMutation = trpc.auth.verifyOtp.useMutation();
 
+  const phoneRef = useRef<TextInput | null>(null);
+  const codeRef = useRef<TextInput | null>(null);
+
   const normalizedPhone = useMemo(() => (phone.startsWith(PHONE_PREFIX) ? phone : `${PHONE_PREFIX}${phone}`), [phone]);
   const phoneValid = useMemo(() => /^\+?966\d{9}$/.test(normalizedPhone), [normalizedPhone]);
   const codeValid = useMemo(() => /^\d{6}$/.test(code), [code]);
 
   useEffect(() => {
-    if (stage === "enter-code" && cooldown === 0 && requestOtpMutation.isSuccess) {
-      // ensure cooldown starts once after sending
+    if (stage === "enter-code") {
+      setTimeout(() => codeRef.current?.focus?.(), 50);
+    } else {
+      setTimeout(() => phoneRef.current?.focus?.(), 50);
     }
-  }, [stage, cooldown, requestOtpMutation.isSuccess]);
+  }, [stage]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined;
@@ -49,6 +57,14 @@ export default function LoginScreen() {
       if (timer) clearInterval(timer);
     };
   }, [cooldown]);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | undefined;
+    if (expiresIn > 0) {
+      timer = setInterval(() => setExpiresIn((s) => Math.max(0, s - 1)), 1000);
+    }
+    return () => { if (timer) clearInterval(timer); };
+  }, [expiresIn]);
 
   const startCooldown = () => setCooldown(RESEND_COOLDOWN_SECONDS);
 
@@ -63,6 +79,7 @@ export default function LoginScreen() {
       console.log("[Login] requestOtp success", res);
       setStage("enter-code");
       startCooldown();
+      setExpiresIn((res as any)?.expiresInSec ?? CODE_EXPIRES_SECONDS_FALLBACK);
     } catch (e: any) {
       console.error("[Login] requestOtp error", e);
       Alert.alert("OTP Error", e?.message ?? "Failed to send OTP. Try again.");
@@ -73,8 +90,9 @@ export default function LoginScreen() {
     if (cooldown > 0 || !phoneValid) return;
     try {
       console.log("[Login] resendOtp", normalizedPhone);
-      await requestOtpMutation.mutateAsync({ phone: normalizedPhone });
+      const res = await requestOtpMutation.mutateAsync({ phone: normalizedPhone });
       startCooldown();
+      setExpiresIn((res as any)?.expiresInSec ?? CODE_EXPIRES_SECONDS_FALLBACK);
     } catch (e: any) {
       console.error("[Login] resend error", e);
       Alert.alert("Resend Error", e?.message ?? "Failed to resend code");
@@ -131,13 +149,17 @@ export default function LoginScreen() {
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: c.textSecondary }]}>Phone Number</Text>
             <TextInput
+              ref={phoneRef}
               keyboardType="phone-pad"
               placeholder="e.g. 512345678"
               placeholderTextColor={c.textSecondary}
               value={phone}
-              onChangeText={(t) => { setPhone(t); if (!touched.phone) setTouched((v) => ({ ...v, phone: true })); }}
+              onChangeText={(t) => { setPhone(t.replace(/\D/g, "")); if (!touched.phone) setTouched((v) => ({ ...v, phone: true })); }}
               style={[styles.input, { color: c.text, borderColor: phoneError ? "#E53935" : c.border, backgroundColor: c.background }]}
               onBlur={() => setTouched((v) => ({ ...v, phone: true }))}
+              autoFocus
+              returnKeyType="next"
+              onSubmitEditing={() => setStage("enter-code")}
               testID="input-phone"
             />
             {phoneError ? <Text style={[styles.inlineError]} testID="error-phone">{phoneError}</Text> : null}
@@ -153,14 +175,24 @@ export default function LoginScreen() {
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: c.textSecondary }]}>Verification Code</Text>
             <TextInput
+              ref={codeRef}
               keyboardType="number-pad"
               placeholder="123456"
               placeholderTextColor={c.textSecondary}
               value={code}
-              onChangeText={(t) => { setCode(t); if (!touched.code) setTouched((v) => ({ ...v, code: true })); }}
+              onChangeText={(t) => {
+                const digits = t.replace(/\D/g, "");
+                setCode(digits);
+                if (!touched.code) setTouched((v) => ({ ...v, code: true }));
+                if (digits.length === 6) {
+                  setTimeout(() => onVerifyOtp(), 50);
+                }
+              }}
               maxLength={6}
               style={[styles.input, { color: c.text, borderColor: codeError ? "#E53935" : c.border, backgroundColor: c.background, letterSpacing: 6 }]}
               onBlur={() => setTouched((v) => ({ ...v, code: true }))}
+              autoFocus
+              returnKeyType="done"
               testID="input-code"
             />
             {codeError ? <Text style={styles.inlineError} testID="error-code">{codeError}</Text> : null}
@@ -172,6 +204,11 @@ export default function LoginScreen() {
               testID="btn-verify"
               rightIcon={<CheckCircle2 size={18} color="white" />}
             />
+            <View style={styles.hintRow}>
+              <Text style={[styles.hintText, { color: c.textSecondary }]}>
+                {expiresIn > 0 ? `Code expires in ${Math.floor(expiresIn/60)}m ${expiresIn%60}s` : "Request a new code if expired"}
+              </Text>
+            </View>
             <View style={styles.resendRow}>
               <Text style={[styles.resendText, { color: c.textSecondary }]}>
                 {cooldown > 0 ? `Resend in ${cooldown}s` : "Didn't get the code?"}
@@ -179,10 +216,30 @@ export default function LoginScreen() {
               <AnimatedPressButton
                 onPress={onResend}
                 disabled={cooldown > 0 || requestOtpMutation.isPending}
-                label={cooldown > 0 ? "Resend" : "Resend"}
+                label={"Resend"}
                 color={cooldown > 0 ? `${c.secondary ?? c.primary}66` : (c.secondary ?? c.primary)}
                 testID="btn-resend-otp"
                 rightIcon={<RotateCcw size={16} color="white" />}
+              />
+              <AnimatedPressButton
+                onPress={async () => {
+                  try {
+                    const text = await Clipboard.getStringAsync();
+                    const digits = (text ?? "").replace(/\D/g, "").slice(0,6);
+                    if (digits.length === 6) {
+                      setCode(digits);
+                      setTimeout(() => onVerifyOtp(), 50);
+                    } else {
+                      Alert.alert("Paste", "Clipboard doesn't contain a 6-digit code");
+                    }
+                  } catch (e) {
+                    console.log('[Login] clipboard error', e);
+                  }
+                }}
+                disabled={verifyOtpMutation.isPending}
+                label={"Paste Code"}
+                color={c.primary}
+                testID="btn-paste-code"
               />
             </View>
           </View>
@@ -268,6 +325,8 @@ const styles = StyleSheet.create({
   buttonText: { color: "white", fontWeight: "600" as const, fontSize: 16 },
   errorText: { marginTop: 10, fontSize: 13 },
   inlineError: { color: "#E53935", fontSize: 12, marginTop: 6 },
+  hintRow: { marginTop: 8 },
+  hintText: { fontSize: 12 },
   resendRow: { marginTop: 12, gap: 8 },
   resendText: { fontSize: 12 },
 });
