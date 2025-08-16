@@ -60,7 +60,7 @@ export default function LoginScreen() {
       const res = await verifyOtpMutation.mutateAsync({ phone: normalizedPhone, code });
       console.log("[Login] verifyOtp success", res);
       Alert.alert("Verified", "You are signed in", [
-        { text: "OK", onPress: () => router.replace("/(tabs)") },
+        { text: "OK", onPress: () => router.replace("/absher") },
       ]);
     } catch (e: any) {
       console.error("[Login] verifyOtp error", e);

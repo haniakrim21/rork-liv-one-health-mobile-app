@@ -24,5 +24,5 @@ export default publicProcedure
 
     const token = `mock-token-${Date.now()}`;
 
-    return { success: true as const, token };
+    return { success: true as const, token, profile: { firstName: 'LIV', lastName: 'User', phone: input.phone } };
   });
