@@ -5,6 +5,7 @@ import { ShieldCheck, PhoneCall, CheckCircle2 } from "lucide-react-native";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/providers/AuthProvider";
 
 const PHONE_PREFIX = "+966" as const;
 
@@ -12,6 +13,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const { theme } = useAppSettings();
   const c = colors[theme];
+  const { setToken, setProfile } = useAuth();
 
   const [phone, setPhone] = useState<string>("");
   const [code, setCode] = useState<string>("");
@@ -59,6 +61,10 @@ export default function LoginScreen() {
       console.log("[Login] verifyOtp", { phone: normalizedPhone });
       const res = await verifyOtpMutation.mutateAsync({ phone: normalizedPhone, code });
       console.log("[Login] verifyOtp success", res);
+      await setToken(res?.token ?? undefined);
+      if (res?.profile) {
+        await setProfile(res.profile as any);
+      }
       Alert.alert("Verified", "You are signed in", [
         { text: "OK", onPress: () => router.replace("/absher") },
       ]);

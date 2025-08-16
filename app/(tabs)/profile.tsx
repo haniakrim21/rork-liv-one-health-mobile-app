@@ -1,12 +1,13 @@
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useMemo, useRef, useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
   View,
-  ScrollView,
   Switch,
   Platform,
   Animated,
+  TextInput,
+  Alert,
 } from "react-native";
 import {
   User,
@@ -18,21 +19,29 @@ import {
   Shield,
   LogOut,
   ChevronRight,
+  Save,
 } from "lucide-react-native";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import AnimatedPressable from "@/components/AnimatedPressable";
+import { useAuth } from "@/providers/AuthProvider";
 
 export default function ProfileScreen() {
   const { theme, language, toggleTheme, toggleLanguage } = useAppSettings();
   const currentColors = colors[theme];
+  const { profile, signOut, setProfile } = useAuth();
 
-  const profileInfo = {
-    name: "John Doe",
-    email: "john.doe@example.com",
-    memberSince: "January 2024",
-    plan: "Premium",
-  };
+  const [firstName, setFirstName] = useState<string>(profile?.firstName ?? "");
+  const [lastName, setLastName] = useState<string>(profile?.lastName ?? "");
+  const [phone, setPhone] = useState<string>(profile?.phone ?? "");
+  const [email, setEmail] = useState<string>(profile?.email ?? "");
+
+  useEffect(() => {
+    setFirstName(profile?.firstName ?? "");
+    setLastName(profile?.lastName ?? "");
+    setPhone(profile?.phone ?? "");
+    setEmail(profile?.email ?? "");
+  }, [profile]);
 
   type SwitchSettingItem = {
     icon: any;
@@ -70,36 +79,6 @@ export default function ProfileScreen() {
           value: language === "ar" ? "العربية" : "English",
           onPress: toggleLanguage,
         },
-        {
-          icon: Bell,
-          title: "Notifications",
-          type: "button",
-          value: "Enabled",
-          onPress: () => {},
-        },
-      ],
-    },
-    {
-      title: "Account",
-      items: [
-        {
-          icon: User,
-          title: "Edit Profile",
-          type: "button",
-          onPress: () => {},
-        },
-        {
-          icon: Shield,
-          title: "Privacy & Security",
-          type: "button",
-          onPress: () => {},
-        },
-        {
-          icon: Settings,
-          title: "Advanced Settings",
-          type: "button",
-          onPress: () => {},
-        },
       ],
     },
   ];
@@ -108,6 +87,20 @@ export default function ProfileScreen() {
   useEffect(() => {
     Animated.timing(mount, { toValue: 1, duration: 500, useNativeDriver: Platform.OS !== 'web' }).start();
   }, [mount]);
+
+  const onSaveProfile = async () => {
+    try {
+      await setProfile({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        phone: phone.trim(),
+        email: email.trim() || undefined,
+      });
+      Alert.alert("Saved", "Profile updated");
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Failed to save profile");
+    }
+  };
 
   return (
     <Animated.ScrollView
@@ -120,34 +113,69 @@ export default function ProfileScreen() {
           <User size={40} color={currentColors.primary} />
         </View>
         <Text style={[styles.profileName, { color: currentColors.text }]}>
-          {profileInfo.name}
+          {firstName || lastName ? `${firstName} ${lastName}`.trim() : (language === 'ar' ? 'مستخدم' : 'User')}
         </Text>
         <Text style={[styles.profileEmail, { color: currentColors.textSecondary }]}>
-          {profileInfo.email}
+          {email || profile?.phone || ''}
         </Text>
-        <View style={styles.profileBadges}>
-          <View
-            style={[
-              styles.badge,
-              { backgroundColor: `${currentColors.primary}20` },
-            ]}
-          >
-            <Text style={[styles.badgeText, { color: currentColors.primary }]}>
-              {profileInfo.plan}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.badge,
-              { backgroundColor: `${currentColors.secondary}20` },
-            ]}
-          >
-            <Text style={[styles.badgeText, { color: currentColors.secondary }]}>
-              Since {profileInfo.memberSince}
-            </Text>
-          </View>
-        </View>
       </Animated.View>
+
+      <View style={[styles.groupCard, { backgroundColor: currentColors.card }]}>
+        <View style={[styles.formRow, { borderBottomColor: currentColors.border }]}>
+          <Text style={[styles.formLabel, { color: currentColors.textSecondary }]}>First Name</Text>
+          <TextInput
+            value={firstName}
+            onChangeText={setFirstName}
+            placeholder="First name"
+            placeholderTextColor={currentColors.textSecondary}
+            style={[styles.formInput, { color: currentColors.text }]}
+            testID="input-first-name"
+          />
+        </View>
+        <View style={[styles.formRow, { borderBottomColor: currentColors.border }]}>
+          <Text style={[styles.formLabel, { color: currentColors.textSecondary }]}>Last Name</Text>
+          <TextInput
+            value={lastName}
+            onChangeText={setLastName}
+            placeholder="Last name"
+            placeholderTextColor={currentColors.textSecondary}
+            style={[styles.formInput, { color: currentColors.text }]}
+            testID="input-last-name"
+          />
+        </View>
+        <View style={[styles.formRow, { borderBottomColor: currentColors.border }]}>
+          <Text style={[styles.formLabel, { color: currentColors.textSecondary }]}>Phone</Text>
+          <TextInput
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="+966512345678"
+            placeholderTextColor={currentColors.textSecondary}
+            keyboardType="phone-pad"
+            style={[styles.formInput, { color: currentColors.text }]}
+            testID="input-phone"
+          />
+        </View>
+        <View style={[styles.formRow, { borderBottomColor: currentColors.border }]}>
+          <Text style={[styles.formLabel, { color: currentColors.textSecondary }]}>Email</Text>
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@example.com"
+            placeholderTextColor={currentColors.textSecondary}
+            keyboardType="email-address"
+            style={[styles.formInput, { color: currentColors.text }]}
+            testID="input-email"
+          />
+        </View>
+        <AnimatedPressable
+          style={[styles.saveButton, { backgroundColor: currentColors.primary }]}
+          onPress={onSaveProfile}
+          testID="btn-save-profile"
+        >
+          <Save size={18} color="#fff" />
+          <Text style={styles.saveText}>Save</Text>
+        </AnimatedPressable>
+      </View>
 
       {settingsGroups.map((group, groupIndex) => (
         <Animated.View key={groupIndex} style={[styles.settingsGroup, { opacity: mount, transform: [{ translateY: mount.interpolate({ inputRange: [0,1], outputRange: [24 + groupIndex * 4, 0] }) }] }]}>
@@ -231,7 +259,7 @@ export default function ProfileScreen() {
 
       <AnimatedPressable
         style={[styles.logoutButton, { borderColor: "#E91E63" }]}
-        onPress={() => console.log('[Profile] Sign out pressed')}
+        onPress={async () => { await signOut(); Alert.alert("Signed out", "See you soon"); }}
         testID="logout-button"
       >
         <LogOut size={20} color="#E91E63" />
@@ -307,6 +335,23 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
+  formRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  formLabel: {
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  formInput: {
+    borderWidth: 1,
+    borderColor: "#00000010",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+  },
   settingItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -355,5 +400,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500" as const,
     color: "#E91E63",
+  },
+  saveButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    margin: 16,
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  saveText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600" as const,
   },
 });

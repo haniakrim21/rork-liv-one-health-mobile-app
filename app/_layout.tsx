@@ -15,9 +15,10 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   const router = useRouter();
-  const { token, absherVerified } = useAuth();
+  const { token, absherVerified, isHydrating } = useAuth();
 
   useEffect(() => {
+    if (isHydrating) return;
     if (!token) {
       router.replace("/login");
       return;
@@ -29,7 +30,7 @@ function RootLayoutNav() {
     if (token && absherVerified) {
       router.replace("/(tabs)");
     }
-  }, [token, absherVerified, router]);
+  }, [token, absherVerified, isHydrating, router]);
 
   return (
     <Stack screenOptions={{ headerBackTitle: "Back", animation: "fade" }}>
@@ -47,8 +48,8 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <AppSettingsProvider>
             <HealthDataProvider>
@@ -60,7 +61,7 @@ export default function RootLayout() {
             </HealthDataProvider>
           </AppSettingsProvider>
         </GestureHandlerRootView>
-      </QueryClientProvider>
-    </trpc.Provider>
+      </trpc.Provider>
+    </QueryClientProvider>
   );
 }

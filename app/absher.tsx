@@ -5,11 +5,13 @@ import { ShieldCheck, ExternalLink, CheckCircle2, Link2 } from "lucide-react-nat
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/providers/AuthProvider";
 
 export default function AbsherVerifyScreen() {
   const router = useRouter();
   const { theme, language } = useAppSettings();
   const c = colors[theme];
+  const { setAbsherVerified, setProfile } = useAuth();
 
   const [code, setCode] = useState<string>("");
   const [requestId, setRequestId] = useState<string>("");
@@ -58,6 +60,10 @@ export default function AbsherVerifyScreen() {
     try {
       const res = await verifyMutation.mutateAsync({ requestId, code });
       console.log("[Absher] verify success", res);
+      if (res?.profile) {
+        await setProfile(res.profile as any);
+      }
+      await setAbsherVerified(true);
       Alert.alert("Verified", "Identity verified", [
         { text: "OK", onPress: () => router.replace("/(tabs)") },
       ]);
