@@ -13,9 +13,9 @@ export default publicProcedure
 
     await new Promise((res) => setTimeout(res, 250));
 
-    const ok = input.code === "0000";
+    const ok = /^\d{4,8}$/.test(input.code);
     if (!ok) {
-      throw new Error("Failed to verify identity. Please try again.");
+      throw new Error("Invalid verification code. Please enter a 4-8 digit code.");
     }
 
     return {

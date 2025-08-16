@@ -15,7 +15,7 @@ export default publicProcedure
     await new Promise((res) => setTimeout(res, 200));
 
     const requestId = `absher-${Date.now()}`;
-    const redirectUrl = `https://example.absher.sa/oauth/authorize?request_id=${encodeURIComponent(requestId)}&locale=${input.locale}`;
+    const redirectUrl = `https://example.absher.sa/oauth/authorize?requestId=${encodeURIComponent(requestId)}&locale=${input.locale}`;
 
     return { requestId, redirectUrl };
   });
