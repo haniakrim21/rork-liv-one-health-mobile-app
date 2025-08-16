@@ -1,13 +1,14 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Stack, useRouter } from "expo-router";
 import { View, Text, StyleSheet, TextInput, Platform, Animated, Alert } from "react-native";
-import { ShieldCheck, PhoneCall, CheckCircle2 } from "lucide-react-native";
+import { ShieldCheck, PhoneCall, CheckCircle2, RotateCcw } from "lucide-react-native";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/providers/AuthProvider";
 
 const PHONE_PREFIX = "+966" as const;
+const RESEND_COOLDOWN_SECONDS = 45 as const;
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -18,27 +19,42 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState<string>("");
   const [code, setCode] = useState<string>("");
   const [stage, setStage] = useState<"enter-phone" | "enter-code">("enter-phone");
+  const [cooldown, setCooldown] = useState<number>(0);
+  const [touched, setTouched] = useState<{ phone: boolean; code: boolean }>({ phone: false, code: false });
 
   const mount = useRef(new Animated.Value(0)).current;
-  React.useEffect(() => {
+  useEffect(() => {
     Animated.timing(mount, { toValue: 1, duration: 450, useNativeDriver: Platform.OS !== 'web' }).start();
   }, [mount]);
 
   const requestOtpMutation = trpc.auth.requestOtp.useMutation();
   const verifyOtpMutation = trpc.auth.verifyOtp.useMutation();
 
-  const canRequest = useMemo(() => {
-    const normalized = phone.startsWith(PHONE_PREFIX) ? phone : `${PHONE_PREFIX}${phone}`;
-    return /^\+?966\d{9}$/.test(normalized);
-  }, [phone]);
-
-  const canVerify = useMemo(() => /^\d{6}$/.test(code), [code]);
-
   const normalizedPhone = useMemo(() => (phone.startsWith(PHONE_PREFIX) ? phone : `${PHONE_PREFIX}${phone}`), [phone]);
+  const phoneValid = useMemo(() => /^\+?966\d{9}$/.test(normalizedPhone), [normalizedPhone]);
+  const codeValid = useMemo(() => /^\d{6}$/.test(code), [code]);
+
+  useEffect(() => {
+    if (stage === "enter-code" && cooldown === 0 && requestOtpMutation.isSuccess) {
+      // ensure cooldown starts once after sending
+    }
+  }, [stage, cooldown, requestOtpMutation.isSuccess]);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | undefined;
+    if (cooldown > 0) {
+      timer = setInterval(() => setCooldown((s) => Math.max(0, s - 1)), 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [cooldown]);
+
+  const startCooldown = () => setCooldown(RESEND_COOLDOWN_SECONDS);
 
   const onRequestOtp = async () => {
-    if (!canRequest) {
-      Alert.alert("Invalid number", "Please enter a valid Saudi phone number");
+    setTouched((t) => ({ ...t, phone: true }));
+    if (!phoneValid) {
       return;
     }
     try {
@@ -46,15 +62,28 @@ export default function LoginScreen() {
       const res = await requestOtpMutation.mutateAsync({ phone: normalizedPhone });
       console.log("[Login] requestOtp success", res);
       setStage("enter-code");
+      startCooldown();
     } catch (e: any) {
       console.error("[Login] requestOtp error", e);
       Alert.alert("OTP Error", e?.message ?? "Failed to send OTP. Try again.");
     }
   };
 
+  const onResend = async () => {
+    if (cooldown > 0 || !phoneValid) return;
+    try {
+      console.log("[Login] resendOtp", normalizedPhone);
+      await requestOtpMutation.mutateAsync({ phone: normalizedPhone });
+      startCooldown();
+    } catch (e: any) {
+      console.error("[Login] resend error", e);
+      Alert.alert("Resend Error", e?.message ?? "Failed to resend code");
+    }
+  };
+
   const onVerifyOtp = async () => {
-    if (!canVerify) {
-      Alert.alert("Invalid code", "Enter the 6-digit code");
+    setTouched((t) => ({ ...t, code: true }));
+    if (!codeValid) {
       return;
     }
     try {
@@ -73,6 +102,9 @@ export default function LoginScreen() {
       Alert.alert("Verification Error", e?.message ?? "Invalid or expired code");
     }
   };
+
+  const phoneError = touched.phone && !phoneValid ? "Enter a valid +966XXXXXXXXX number" : "";
+  const codeError = touched.code && !codeValid ? "Enter the 6-digit code" : "";
 
   return (
     <View style={[styles.container, { backgroundColor: c.background }]} testID="login-screen">
@@ -103,13 +135,15 @@ export default function LoginScreen() {
               placeholder="e.g. 512345678"
               placeholderTextColor={c.textSecondary}
               value={phone}
-              onChangeText={setPhone}
-              style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.background }]}
+              onChangeText={(t) => { setPhone(t); if (!touched.phone) setTouched((v) => ({ ...v, phone: true })); }}
+              style={[styles.input, { color: c.text, borderColor: phoneError ? "#E53935" : c.border, backgroundColor: c.background }]}
+              onBlur={() => setTouched((v) => ({ ...v, phone: true }))}
               testID="input-phone"
             />
+            {phoneError ? <Text style={[styles.inlineError]} testID="error-phone">{phoneError}</Text> : null}
             <AnimatedPressButton
               onPress={onRequestOtp}
-              disabled={requestOtpMutation.isPending || !canRequest}
+              disabled={requestOtpMutation.isPending || !phoneValid}
               label={requestOtpMutation.isPending ? "Sending..." : "Send Code"}
               color={c.primary}
               testID="btn-send-otp"
@@ -123,19 +157,34 @@ export default function LoginScreen() {
               placeholder="123456"
               placeholderTextColor={c.textSecondary}
               value={code}
-              onChangeText={setCode}
+              onChangeText={(t) => { setCode(t); if (!touched.code) setTouched((v) => ({ ...v, code: true })); }}
               maxLength={6}
-              style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.background, letterSpacing: 6 }]}
+              style={[styles.input, { color: c.text, borderColor: codeError ? "#E53935" : c.border, backgroundColor: c.background, letterSpacing: 6 }]}
+              onBlur={() => setTouched((v) => ({ ...v, code: true }))}
               testID="input-code"
             />
+            {codeError ? <Text style={styles.inlineError} testID="error-code">{codeError}</Text> : null}
             <AnimatedPressButton
               onPress={onVerifyOtp}
-              disabled={verifyOtpMutation.isPending || !canVerify}
+              disabled={verifyOtpMutation.isPending || !codeValid}
               label={verifyOtpMutation.isPending ? "Verifying..." : "Verify"}
               color={c.primary}
               testID="btn-verify"
               rightIcon={<CheckCircle2 size={18} color="white" />}
             />
+            <View style={styles.resendRow}>
+              <Text style={[styles.resendText, { color: c.textSecondary }]}>
+                {cooldown > 0 ? `Resend in ${cooldown}s` : "Didn't get the code?"}
+              </Text>
+              <AnimatedPressButton
+                onPress={onResend}
+                disabled={cooldown > 0 || requestOtpMutation.isPending}
+                label={cooldown > 0 ? "Resend" : "Resend"}
+                color={cooldown > 0 ? `${c.secondary ?? c.primary}66` : (c.secondary ?? c.primary)}
+                testID="btn-resend-otp"
+                rightIcon={<RotateCcw size={16} color="white" />}
+              />
+            </View>
           </View>
         )}
 
@@ -147,6 +196,12 @@ export default function LoginScreen() {
       </Animated.View>
     </View>
   );
+}
+
+function InlineIcon({ element, marginLeft }: { element?: React.ReactNode; marginLeft?: number }) {
+  if (!element) return null;
+  if (!React.isValidElement(element)) return null;
+  return <Text style={{ marginLeft: marginLeft ?? 0 }}>{element as any}</Text>;
 }
 
 function AnimatedPressButton({ onPress, disabled, label, color, testID, rightIcon }: { onPress: () => void; disabled?: boolean; label: string; color: string; testID?: string; rightIcon?: React.ReactNode; }) {
@@ -165,7 +220,7 @@ function AnimatedPressButton({ onPress, disabled, label, color, testID, rightIco
         {...({ onStartShouldSetResponder: () => true, onResponderRelease: () => { if (!disabled) onPress(); } } as any)}
       >
         <Text style={styles.buttonText}>{label}</Text>
-        {rightIcon ? <View style={{ marginLeft: 6 }}>{rightIcon}</View> : null}
+        <InlineIcon element={rightIcon} marginLeft={6} />
       </View>
     </Animated.View>
   );
@@ -212,4 +267,7 @@ const styles = StyleSheet.create({
   },
   buttonText: { color: "white", fontWeight: "600" as const, fontSize: 16 },
   errorText: { marginTop: 10, fontSize: 13 },
+  inlineError: { color: "#E53935", fontSize: 12, marginTop: 6 },
+  resendRow: { marginTop: 12, gap: 8 },
+  resendText: { fontSize: 12 },
 });

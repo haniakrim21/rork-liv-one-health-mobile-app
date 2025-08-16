@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Stack, useRouter } from "expo-router";
 import { View, Text, StyleSheet, Platform, Animated, TextInput, Linking, Alert } from "react-native";
 import { ShieldCheck, ExternalLink, CheckCircle2, Link2 } from "lucide-react-native";
@@ -6,6 +6,19 @@ import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/providers/AuthProvider";
+
+function parseAbsherParams(url?: string | null) {
+  try {
+    if (!url) return {} as { requestId?: string; code?: string };
+    const u = new URL(url);
+    if (!u.pathname.includes("absher")) return {} as { requestId?: string; code?: string };
+    const requestId = u.searchParams.get("requestId") ?? undefined;
+    const code = u.searchParams.get("code") ?? undefined;
+    return { requestId, code } as { requestId?: string; code?: string };
+  } catch {
+    return {} as { requestId?: string; code?: string };
+  }
+}
 
 export default function AbsherVerifyScreen() {
   const router = useRouter();
@@ -21,9 +34,33 @@ export default function AbsherVerifyScreen() {
   const verifyMutation = trpc.auth.verifyAbsher.useMutation();
 
   const mount = useRef(new Animated.Value(0)).current;
-  React.useEffect(() => {
+  useEffect(() => {
     Animated.timing(mount, { toValue: 1, duration: 450, useNativeDriver: Platform.OS !== 'web' }).start();
   }, [mount]);
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const initialUrl = await Linking.getInitialURL();
+        const p = parseAbsherParams(initialUrl);
+        if (p.requestId) setRequestId(p.requestId);
+        if (p.code) setCode(p.code);
+      } catch (e) {
+        console.log('[Absher] getInitialURL error', e);
+      }
+    };
+    init();
+    const sub = Linking.addEventListener('url', ({ url }) => {
+      console.log('[Absher] deep link', url);
+      const p = parseAbsherParams(url);
+      if (p.requestId) setRequestId(p.requestId);
+      if (p.code) setCode(p.code);
+    });
+    return () => {
+      const anySub = sub as unknown as { remove?: () => void };
+      if (anySub?.remove) anySub.remove();
+    };
+  }, []);
 
   const canVerify = useMemo(() => code.trim().length >= 4 && requestId.length > 0, [code, requestId]);
 
@@ -145,6 +182,12 @@ export default function AbsherVerifyScreen() {
   );
 }
 
+function InlineIcon({ element, marginLeft, marginRight }: { element?: React.ReactNode; marginLeft?: number; marginRight?: number }) {
+  if (!element) return null;
+  if (!React.isValidElement(element)) return null;
+  return <Text style={{ marginLeft: marginLeft ?? 0, marginRight: marginRight ?? 0 }}>{element as any}</Text>;
+}
+
 function PrimaryButton({ onPress, disabled, label, color, testID, leftIcon, rightIcon }: { onPress: () => void; disabled?: boolean; label: string; color: string; testID?: string; leftIcon?: React.ReactNode; rightIcon?: React.ReactNode; }) {
   const scale = React.useRef(new Animated.Value(1)).current;
   const animate = (to: number, duration: number) => {
@@ -160,9 +203,9 @@ function PrimaryButton({ onPress, disabled, label, color, testID, leftIcon, righ
         style={[styles.button, { backgroundColor: disabled ? `${color}66` : color }]}
         {...({ onStartShouldSetResponder: () => true, onResponderRelease: () => { if (!disabled) onPress(); } } as any)}
       >
-        {leftIcon ? <View style={{ marginRight: 6 }}>{leftIcon}</View> : null}
+        <InlineIcon element={leftIcon} marginRight={6} />
         <Text style={styles.buttonText}>{label}</Text>
-        {rightIcon ? <View style={{ marginLeft: 6 }}>{rightIcon}</View> : null}
+        <InlineIcon element={rightIcon} marginLeft={6} />
       </View>
     </Animated.View>
   );

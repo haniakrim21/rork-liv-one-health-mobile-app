@@ -29,7 +29,7 @@ import { useAuth } from "@/providers/AuthProvider";
 export default function ProfileScreen() {
   const { theme, language, toggleTheme, toggleLanguage } = useAppSettings();
   const currentColors = colors[theme];
-  const { profile, signOut, setProfile } = useAuth();
+  const { profile, signOut, setProfile, absherVerified, token } = useAuth();
 
   const [firstName, setFirstName] = useState<string>(profile?.firstName ?? "");
   const [lastName, setLastName] = useState<string>(profile?.lastName ?? "");
@@ -118,6 +118,18 @@ export default function ProfileScreen() {
         <Text style={[styles.profileEmail, { color: currentColors.textSecondary }]}>
           {email || profile?.phone || ''}
         </Text>
+        <View style={styles.profileBadges} testID="auth-badges">
+          <View style={[styles.badge, { backgroundColor: token ? `${currentColors.success}22` : `${currentColors.error}22` }]}>
+            <Text style={[styles.badgeText, { color: token ? currentColors.success : currentColors.error }]}>
+              {token ? 'Signed In' : 'Signed Out'}
+            </Text>
+          </View>
+          <View style={[styles.badge, { backgroundColor: absherVerified ? `${currentColors.success}22` : `${currentColors.warning}22` }]}>
+            <Text style={[styles.badgeText, { color: absherVerified ? currentColors.success : currentColors.warning }]}>
+              {absherVerified ? 'Absher Verified' : 'Absher Pending'}
+            </Text>
+          </View>
+        </View>
       </Animated.View>
 
       <View style={[styles.groupCard, { backgroundColor: currentColors.card }]}>
