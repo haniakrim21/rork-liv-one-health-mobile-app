@@ -7,6 +7,7 @@ import {
   Dimensions,
   Animated,
   Platform,
+  RefreshControl,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
@@ -17,6 +18,7 @@ import { useHealthData } from "@/providers/HealthDataProvider";
 import { colors } from "@/constants/colors";
 import AnimatedPressable from "@/components/AnimatedPressable";
 import { MOCK_PHOTOS, MOCK_VIDEOS } from "@/constants/mockMedia";
+import { trpc } from "@/lib/trpc";
 
 const { width } = Dimensions.get("window");
 const cardWidth = (width - 48) / 2;
@@ -25,6 +27,10 @@ export default function DashboardScreen() {
   const { theme } = useAppSettings();
   const { dailyStats } = useHealthData();
   const currentColors = colors[theme];
+
+  const statsQuery = trpc.dashboard.getStats.useQuery(undefined, {
+    staleTime: 15_000,
+  });
 
   const mount = useRef(new Animated.Value(0)).current;
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -92,12 +98,27 @@ export default function DashboardScreen() {
 
   const galleryImages = MOCK_PHOTOS.slice(0, 8).map((p) => p.url);
 
+  const onRefresh = React.useCallback(() => {
+    console.log('[Dashboard] pull-to-refresh');
+    statsQuery.refetch();
+  }, [statsQuery]);
+
+  const serverStats = statsQuery.data;
+
   return (
     <Animated.ScrollView
       style={[styles.container, { backgroundColor: currentColors.background }]}
       showsVerticalScrollIndicator={false}
       scrollEventThrottle={16}
       onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: Platform.OS !== 'web' })}
+      refreshControl={(
+        <RefreshControl
+          refreshing={statsQuery.isFetching}
+          onRefresh={onRefresh}
+          tintColor={currentColors.primary}
+          colors={[currentColors.primary]}
+        />
+      )}
       testID="dashboard-scroll"
     >
       <Animated.View style={[styles.heroWrapper, { transform: [{ scale: headerScale }] }]}> 
@@ -122,6 +143,12 @@ export default function DashboardScreen() {
           </Animated.View>
         </View>
       </Animated.View>
+
+      {statsQuery.error ? (
+        <View style={[styles.errorBanner, { backgroundColor: `${currentColors.error}15`, borderColor: `${currentColors.error}33` }]} testID="server-error">
+          <Text style={[styles.errorBannerText, { color: currentColors.error }]}>Failed to load dashboard stats</Text>
+        </View>
+      ) : null}
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: currentColors.text }]}>Featured Programs</Text>
@@ -175,15 +202,18 @@ export default function DashboardScreen() {
             >
               <card.icon size={24} color="white" />
             </LinearGradient>
-            <Text style={[styles.statTitle, { color: currentColors.textSecondary }]}>
+            <Text style={[styles.statTitle, { color: currentColors.textSecondary }]}> 
               {card.title}
             </Text>
-            <Text style={[styles.statValue, { color: currentColors.text }]}>
+            <Text style={[styles.statValue, { color: currentColors.text }]}> 
               {card.value}
             </Text>
-            <Text style={[styles.statTarget, { color: currentColors.textSecondary }]}>
+            <Text style={[styles.statTarget, { color: currentColors.textSecondary }]}> 
               of {card.target}
             </Text>
+            {serverStats && index === 0 ? (
+              <Text style={[styles.statServerHint, { color: currentColors.textSecondary }]} testID="server-steps">Server: {serverStats.workoutsToday} workouts today</Text>
+            ) : null}
             <View style={[styles.progressBar, { backgroundColor: currentColors.border }]}>
               <Animated.View
                 style={{
@@ -378,4 +408,14 @@ const styles = StyleSheet.create({
   insightContent: { flex: 1 },
   insightTitle: { fontSize: 16, fontWeight: '600' as const, marginBottom: 4 },
   insightText: { fontSize: 14 },
+
+  errorBanner: {
+    marginTop: 12,
+    marginHorizontal: 16,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+  },
+  errorBannerText: { fontSize: 13 },
+  statServerHint: { fontSize: 12, marginTop: 4 },
 });
