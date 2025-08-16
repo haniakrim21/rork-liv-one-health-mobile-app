@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Stack, useRouter } from "expo-router";
 import { View, Text, StyleSheet, TextInput, Platform, Animated, Alert } from "react-native";
-import * as Clipboard from "expo-clipboard";
 import { ShieldCheck, PhoneCall, CheckCircle2, RotateCcw } from "lucide-react-native";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
@@ -224,12 +223,17 @@ export default function LoginScreen() {
               <AnimatedPressButton
                 onPress={async () => {
                   try {
-                    const text = await Clipboard.getStringAsync();
+                    let text: string = "";
+                    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && (navigator as any)?.clipboard?.readText) {
+                      text = await (navigator as any).clipboard.readText();
+                    } else {
+                      Alert.alert("Clipboard", "Clipboard paste is unavailable on this platform.");
+                    }
                     const digits = (text ?? "").replace(/\D/g, "").slice(0,6);
                     if (digits.length === 6) {
                       setCode(digits);
                       setTimeout(() => onVerifyOtp(), 50);
-                    } else {
+                    } else if (text) {
                       Alert.alert("Paste", "Clipboard doesn't contain a 6-digit code");
                     }
                   } catch (e) {
