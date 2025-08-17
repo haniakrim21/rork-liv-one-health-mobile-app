@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback } from "react";
-import { StyleSheet, Text, View, TouchableOpacity, Animated, FlatList } from "react-native";
+import { StyleSheet, Text, View, TouchableOpacity, FlatList } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, Sparkles, Calendar, Video, ClipboardList, Stethoscope, Brain, ShieldCheck, Link, Pill, Plus } from "lucide-react-native";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
@@ -32,6 +32,11 @@ export default function FeatureDetailsScreen() {
         { key: "book-virtual", title: "Book Virtual Visit", subtitle: "Video in 15 min", icon: <Video size={18} color={palette.primary} /> },
         { key: "book-inclinic", title: "Book In-Clinic", subtitle: "Nearest location", icon: <Calendar size={18} color={palette.primary} /> },
         { key: "bring-records", title: "Attach Health History", subtitle: "Speed up your visit", icon: <ClipboardList size={18} color={palette.primary} /> },
+      ];
+    }
+    if (slug === "lifestyle-health-history") {
+      return [
+        { key: "start-history", title: "Start Health History", subtitle: "Takes ~4 minutes", icon: <ClipboardList size={18} color={palette.primary} /> },
       ];
     }
     if (slug === "virtual-consultations") {
@@ -77,6 +82,20 @@ export default function FeatureDetailsScreen() {
     }
     if (slug === "ai-digital-triage" && key === "start-triage") {
       router.push({ pathname: "/feature/triage" });
+      return;
+    }
+    if (slug === "virtual-consultations") {
+      if (key === "new-video") {
+        router.push({ pathname: "/feature/booking", params: { type: "virtual" } });
+        return;
+      }
+      if (key === "choose-specialty") {
+        router.push({ pathname: "/feature/booking", params: { type: "inclinic" } });
+        return;
+      }
+    }
+    if (slug === "lifestyle-health-history" && key === "start-history") {
+      router.push({ pathname: "/feature/history" });
       return;
     }
   }, [router, slug]);
