@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,107 +10,59 @@ import {
   RefreshControl,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Image } from "expo-image";
-import { useVideoPlayer, VideoView } from "expo-video";
-import { Activity, Flame, Moon, Droplets, Heart, TrendingUp, Apple } from "lucide-react-native";
+import { Activity, Flame, Moon, Droplets, Heart, TrendingUp, Apple, CalendarDays, Dumbbell, Bed, Utensils, Trophy, Sparkles, Clock, BarChart3 } from "lucide-react-native";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { useHealthData } from "@/providers/HealthDataProvider";
 import { colors } from "@/constants/colors";
 import AnimatedPressable from "@/components/AnimatedPressable";
-import { MOCK_PHOTOS, MOCK_VIDEOS } from "@/constants/mockMedia";
 import { trpc } from "@/lib/trpc";
 
 const { width } = Dimensions.get("window");
 const cardWidth = (width - 48) / 2;
 
 export default function DashboardScreen() {
+  console.log("[Dashboard] mount");
   const { theme } = useAppSettings();
-  const { dailyStats } = useHealthData();
+  const { dailyStats, activities, meals, goals, sleepData } = useHealthData();
   const currentColors = colors[theme];
 
-  const statsQuery = trpc.dashboard.getStats.useQuery(undefined, {
-    staleTime: 15_000,
-  });
+  const statsQuery = trpc.dashboard.getStats.useQuery(undefined, { staleTime: 15_000 });
 
   const mount = useRef(new Animated.Value(0)).current;
   const scrollY = useRef(new Animated.Value(0)).current;
-  const carouselX = useRef(new Animated.Value(0)).current;
-  const heroVideo = MOCK_VIDEOS[0];
-  const player = useVideoPlayer(
-    heroVideo.url,
-    (p) => {
-      p.loop = true;
-      p.muted = true;
-      try { p.play(); } catch (e) { console.log('[Video] play() error', e); }
-    }
-  );
 
   useEffect(() => {
-    Animated.timing(mount, { toValue: 1, duration: 650, useNativeDriver: Platform.OS !== 'web' }).start();
+    Animated.timing(mount, { toValue: 1, duration: 550, useNativeDriver: Platform.OS !== "web" }).start();
   }, [mount]);
 
-  const headerTranslate = mount.interpolate({ inputRange: [0, 1], outputRange: [20, 0] });
+  const dateLabel = useMemo(() => new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }), []);
+
+  const weekSeries = useMemo<number[]>(() => {
+    const base = [12, 9, 10, 14, 11, 16, 13];
+    return base.map((n, i) => Math.max(4, Math.round((n + (i % 2 === 0 ? 1 : -1)) * 1)));
+  }, []);
+
+  const nutrition = useMemo(() => {
+    const totals = meals.reduce((acc, m) => {
+      return { calories: acc.calories + m.calories, protein: acc.protein + m.protein, carbs: acc.carbs + m.carbs, fat: acc.fat + m.fat };
+    }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+    return totals;
+  }, [meals]);
+
   const headerOpacity = mount;
-  const headerScale = scrollY.interpolate({ inputRange: [0, 120], outputRange: [1, 0.96], extrapolate: 'clamp' });
-  const headerGradientOpacity = scrollY.interpolate({ inputRange: [0, 120], outputRange: [1, 0.6], extrapolate: 'clamp' });
-
-  const statsCards = [
-    {
-      title: "Steps",
-      value: dailyStats.steps.toLocaleString(),
-      target: "10,000",
-      icon: Activity,
-      gradient: ["#00C851", "#00A040"] as const,
-      progress: dailyStats.steps / 10000,
-    },
-    {
-      title: "Calories",
-      value: dailyStats.calories.toString(),
-      target: "2,000",
-      icon: Flame,
-      gradient: ["#FF6F00", "#E65100"] as const,
-      progress: dailyStats.calories / 2000,
-    },
-    {
-      title: "Sleep",
-      value: `${dailyStats.sleep}h`,
-      target: "8h",
-      icon: Moon,
-      gradient: ["#7B1FA2", "#6A1B9A"] as const,
-      progress: dailyStats.sleep / 8,
-    },
-    {
-      title: "Water",
-      value: `${dailyStats.water}`,
-      target: "8",
-      icon: Droplets,
-      gradient: ["#1976D2", "#1565C0"] as const,
-      progress: dailyStats.water / 8,
-    },
-  ];
-
-  const quickActions = [
-    { title: "Log Workout", icon: Activity, color: "#00C851" },
-    { title: "Add Meal", icon: Apple, color: "#FF6F00" },
-    { title: "Track Sleep", icon: Moon, color: "#7B1FA2" },
-    { title: "Check Heart", icon: Heart, color: "#E91E63" },
-  ];
-
-  const galleryImages = MOCK_PHOTOS.slice(0, 8).map((p) => p.url);
+  const headerTranslate = mount.interpolate({ inputRange: [0,1], outputRange: [12, 0] });
 
   const onRefresh = React.useCallback(() => {
-    console.log('[Dashboard] pull-to-refresh');
+    console.log("[Dashboard] refresh");
     statsQuery.refetch();
   }, [statsQuery]);
-
-  const serverStats = statsQuery.data;
 
   return (
     <Animated.ScrollView
       style={[styles.container, { backgroundColor: currentColors.background }]}
       showsVerticalScrollIndicator={false}
       scrollEventThrottle={16}
-      onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: Platform.OS !== 'web' })}
+      onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: Platform.OS !== "web" })}
       refreshControl={(
         <RefreshControl
           refreshing={statsQuery.isFetching}
@@ -121,301 +73,269 @@ export default function DashboardScreen() {
       )}
       testID="dashboard-scroll"
     >
-      <Animated.View style={[styles.heroWrapper, { transform: [{ scale: headerScale }] }]}> 
-        <View style={styles.heroMedia}>
-          <VideoView
-            player={player}
-            style={styles.video}
-            allowsFullscreen={false}
-            allowsPictureInPicture={false}
-            contentFit="cover"
-          />
-          <LinearGradient
-            colors={["rgba(0,0,0,0.45)", "rgba(0,0,0,0.25)", "rgba(0,0,0,0.55)"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.overlay}
-          />
-          <Animated.View style={[styles.heroContent, { opacity: Animated.multiply(headerOpacity, headerGradientOpacity), transform: [{ translateY: headerTranslate }] }]}> 
-            <Text style={[styles.kicker]}>Welcome back</Text>
-            <Text style={styles.heroTitle}>Your Personalized Health Hub</Text>
-            <Text style={styles.heroSub}>Insights, coaching, and actions tailored to you</Text>
-          </Animated.View>
+      <LinearGradient colors={[`${currentColors.secondary}22`, "transparent"]} style={styles.headerBg} />
+      <Animated.View style={[styles.headerRow, { opacity: headerOpacity, transform: [{ translateY: headerTranslate }] }]}> 
+        <View style={styles.headerLeft}>
+          <Text style={[styles.kicker, { color: currentColors.textSecondary }]}>Overview</Text>
+          <Text style={[styles.title, { color: currentColors.text }]}>Your Dashboard</Text>
+        </View>
+        <View style={[styles.chip, { borderColor: currentColors.border }]} testID="date-chip">
+          <CalendarDays size={16} color={currentColors.textSecondary} />
+          <Text style={[styles.chipText, { color: currentColors.text }]}>{dateLabel}</Text>
         </View>
       </Animated.View>
 
-      {statsQuery.error ? (
-        <View style={[styles.errorBanner, { backgroundColor: `${currentColors.error}15`, borderColor: `${currentColors.error}33` }]} testID="server-error">
-          <Text style={[styles.errorBannerText, { color: currentColors.error }]}>Failed to load dashboard stats</Text>
-        </View>
-      ) : null}
+      <View style={styles.kpiRow}>
+        <KPI
+          color={colors.light.primary}
+          bg={`${colors.light.primary}1A`}
+          icon={Activity}
+          label="Steps"
+          value={dailyStats.steps.toLocaleString()}
+          testID="kpi-steps"
+        />
+        <KPI
+          color={colors.light.accent}
+          bg={`${colors.light.accent}1A`}
+          icon={Flame}
+          label="Calories"
+          value={`${dailyStats.calories}`}
+          testID="kpi-calories"
+        />
+      </View>
+      <View style={styles.kpiRow}>
+        <KPI
+          color={colors.light.purple}
+          bg={`${colors.light.purple}1A`}
+          icon={Moon}
+          label="Sleep"
+          value={`${dailyStats.sleep}h`}
+          testID="kpi-sleep"
+        />
+        <KPI
+          color={colors.light.secondary}
+          bg={`${colors.light.secondary}1A`}
+          icon={Droplets}
+          label="Water"
+          value={`${dailyStats.water}/8`}
+          testID="kpi-water"
+        />
+      </View>
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: currentColors.text }]}>Featured Programs</Text>
-        <Animated.ScrollView
-          horizontal
-          pagingEnabled
-          snapToInterval={width * 0.8}
-          decelerationRate={Platform.OS === 'ios' ? 0 : 0.98}
-          showsHorizontalScrollIndicator={false}
-          onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: carouselX } } }], { useNativeDriver: Platform.OS !== 'web' })}
-          scrollEventThrottle={16}
-          contentContainerStyle={styles.carouselContainer}
-          testID="featured-carousel"
-        >
-          {galleryImages.map((uri, i) => {
-            const inputRange = [(i - 1) * width * 0.8, i * width * 0.8, (i + 1) * width * 0.8];
-            const scale = carouselX.interpolate({ inputRange, outputRange: [0.92, 1, 0.92], extrapolate: 'clamp' });
-            const opacity = carouselX.interpolate({ inputRange, outputRange: [0.6, 1, 0.6], extrapolate: 'clamp' });
+      <Section title="This Week" icon={BarChart3} tint={currentColors.info}>
+        <View style={styles.bars}>
+          {weekSeries.map((v, i) => {
+            const h = 8 + v * 6;
             return (
-              <AnimatedPressable
-                key={uri}
-                style={[styles.cardLarge, { transform: [{ scale }], opacity }]}
-                onPress={() => console.log('[Dashboard] Open program', uri)}
-                testID={`program-${i}`}
-              >
-                <Image source={{ uri }} style={styles.cardImage} contentFit="cover" transition={250} />
-                <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.65)"]} style={styles.cardGradient} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} />
-                <View style={styles.cardTextWrap}>
-                  <Text style={styles.cardTitle}>Elevate Program</Text>
-                  <Text style={styles.cardSubtitle}>4-week guided plan</Text>
+              <View key={`bar-${i}`} style={styles.barWrap}>
+                <View style={[styles.bar, { height: h, backgroundColor: i === weekSeries.length - 1 ? currentColors.primary : `${currentColors.primary}77` }]} />
+              </View>
+            );
+          })}
+        </View>
+      </Section>
+
+      <Section title="Goals" icon={Trophy} tint={currentColors.primary}>
+        <View style={styles.goalsGrid}>
+          {goals.map((g) => {
+            const pct = Math.min(100, Math.round(g.current / g.target * 100));
+            return (
+              <AnimatedPressable key={g.id} style={[styles.goalCard, { backgroundColor: currentColors.card }]} onPress={() => console.log("[Dashboard] goal", g.id)} testID={`goal-${g.id}`}>
+                <View style={[styles.goalIcon, { backgroundColor: `${g.color}22` }]}>
+                  <Trophy size={18} color={g.color} />
+                </View>
+                <Text style={[styles.goalTitle, { color: currentColors.text }]}>{g.title}</Text>
+                <Text style={[styles.goalMeta, { color: currentColors.textSecondary }]}>{g.current} / {g.target} {g.unit}</Text>
+                <View style={[styles.progressTrack, { backgroundColor: currentColors.border }]}>
+                  <View style={[styles.progressFill, { width: `${pct}%`, backgroundColor: g.color }]} />
                 </View>
               </AnimatedPressable>
             );
           })}
-        </Animated.ScrollView>
-      </View>
+        </View>
+      </Section>
 
-      <Animated.View style={[styles.statsGrid, { opacity: mount, transform: [{ translateY: mount.interpolate({ inputRange: [0,1], outputRange: [16,0] }) }] }]}>
-        {statsCards.map((card, index) => (
-          <AnimatedPressable
-            key={index}
-            style={[styles.statCard, { backgroundColor: currentColors.card, transform: [{ translateY: mount.interpolate({ inputRange: [0,1], outputRange: [12 + index * 2, 0] }) }] }]}
-            testID={`stat-card-${card.title.toLowerCase()}`}
-            onPress={() => console.log(`[Dashboard] Pressed ${card.title}`)}
-          >
-            <LinearGradient
-              colors={card.gradient}
-              style={styles.iconContainer}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <card.icon size={24} color="white" />
-            </LinearGradient>
-            <Text style={[styles.statTitle, { color: currentColors.textSecondary }]}> 
-              {card.title}
-            </Text>
-            <Text style={[styles.statValue, { color: currentColors.text }]}> 
-              {card.value}
-            </Text>
-            <Text style={[styles.statTarget, { color: currentColors.textSecondary }]}> 
-              of {card.target}
-            </Text>
-            {serverStats && index === 0 ? (
-              <Text style={[styles.statServerHint, { color: currentColors.textSecondary }]} testID="server-steps">Server: {serverStats.workoutsToday} workouts today</Text>
-            ) : null}
-            <View style={[styles.progressBar, { backgroundColor: currentColors.border }]}>
-              <Animated.View
-                style={{
-                  height: "100%",
-                  width: "100%",
-                  transform: [
-                    {
-                      scaleX: mount.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, Math.min(card.progress, 1)],
-                      }),
-                    },
-                  ],
-                  backgroundColor: card.gradient[0],
-                  borderRadius: 2,
-                }}
-              />
+      <Section title="Today’s Nutrition" icon={Utensils} tint={currentColors.accent}>
+        <View style={styles.nutritionRow}>
+          <Macro title="Calories" value={`${nutrition.calories}`} color={currentColors.accent} />
+          <Macro title="Protein" value={`${nutrition.protein}g`} color={currentColors.primary} />
+          <Macro title="Carbs" value={`${nutrition.carbs}g`} color={currentColors.info} />
+          <Macro title="Fat" value={`${nutrition.fat}g`} color={colors.light.purple} />
+        </View>
+      </Section>
+
+      <Section title="Activity" icon={Dumbbell} tint={currentColors.primary}>
+        {activities.map((a) => (
+          <View key={a.id} style={[styles.activityItem, { borderColor: currentColors.border }]}> 
+            <View style={[styles.activityIcon, { backgroundColor: `${currentColors.primary}1A` }]}> 
+              <Activity size={16} color={currentColors.primary} />
             </View>
-          </AnimatedPressable>
-        ))}
-      </Animated.View>
-
-      <View style={styles.sectionAlt}>
-        <AnimatedPressable
-          style={[styles.insightCard, { backgroundColor: currentColors.card, transform: [{ translateY: mount.interpolate({ inputRange: [0,1], outputRange: [24,0] }) }], opacity: mount }]}
-          onPress={() => console.log('[Dashboard] Pressed Weekly Progress')}
-          testID="weekly-progress"
-        >
-          <LinearGradient
-            colors={["#00C851", "#1976D2"] as const}
-            style={styles.insightGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <TrendingUp size={24} color="white" />
-          </LinearGradient>
-          <View style={styles.insightContent}>
-            <Text style={[styles.insightTitle, { color: currentColors.text }]}>Weekly Progress</Text>
-            <Text style={[styles.insightText, { color: currentColors.textSecondary }]}>You're 15% more active than last week!</Text>
+            <View style={styles.activityText}>
+              <Text style={[styles.activityTitle, { color: currentColors.text }]}>{a.type}</Text>
+              <Text style={[styles.activityMeta, { color: currentColors.textSecondary }]}>{a.duration}m • {a.calories} kcal</Text>
+            </View>
+            <Clock size={16} color={currentColors.textSecondary} />
           </View>
-        </AnimatedPressable>
-      </View>
+        ))}
+      </Section>
 
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: currentColors.text }]}>Quick Actions</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.quickActionsContainer}
-        >
-          {quickActions.map((action, index) => (
-            <AnimatedPressable
-              key={index}
-              style={[styles.quickAction, { backgroundColor: currentColors.card, transform: [{ translateY: mount.interpolate({ inputRange: [0,1], outputRange: [20,0] }) }], opacity: mount }]}
-              testID={`quick-${action.title.toLowerCase().replace(/\s+/g, '-')}`}
-              onPress={() => console.log(`[Dashboard] Quick action: ${action.title}`)}
-            >
-              <View style={[styles.quickActionIcon, { backgroundColor: `${action.color}20` }]}>
-                <action.icon size={24} color={action.color} />
-              </View>
-              <Text style={[styles.quickActionText, { color: currentColors.text }]}>{action.title}</Text>
-            </AnimatedPressable>
-          ))}
+      <Section title="Sleep" icon={Bed} tint={colors.light.purple}>
+        <View style={[styles.sleepCard, { backgroundColor: currentColors.card }]}> 
+          <View style={[styles.sleepTag, { backgroundColor: `${colors.light.purple}22` }]}>
+            <Moon size={16} color={colors.light.purple} />
+            <Text style={[styles.sleepTagText, { color: colors.light.purple }]}>Quality {sleepData?.quality ?? 80}%</Text>
+          </View>
+          <Text style={[styles.sleepHours, { color: currentColors.text }]}>{dailyStats.sleep}h</Text>
+          <Text style={[styles.sleepMeta, { color: currentColors.textSecondary }]}>Bed {sleepData?.bedtime ?? "--:--"} • Wake {sleepData?.wakeTime ?? "--:--"}</Text>
+        </View>
+      </Section>
+
+      <Section title="Hydration" icon={Droplets} tint={currentColors.secondary}>
+        <View style={styles.waterRow}>
+          {new Array(8).fill(null).map((_, i) => {
+            const filled = i < dailyStats.water;
+            return <View key={`cup-${i}`} style={[styles.cup, { backgroundColor: filled ? currentColors.secondary : "transparent", borderColor: currentColors.border }]} />;
+          })}
+        </View>
+      </Section>
+
+      {statsQuery.error ? (
+        <View style={[styles.errorBanner, { backgroundColor: `${currentColors.error}15`, borderColor: `${currentColors.error}33` }]} testID="server-error">
+          <Text style={[styles.errorBannerText, { color: currentColors.error }]}>Failed to load server stats</Text>
+        </View>
+      ) : (
+        <Section title="Insights" icon={Sparkles} tint={currentColors.info}>
+          <View style={[styles.insightItem, { backgroundColor: currentColors.card }]}> 
+            <TrendingUp size={18} color={currentColors.primary} />
+            <Text style={[styles.insightText, { color: currentColors.text }]}>You are on track. {statsQuery.data?.workoutsToday ?? 0} workouts logged today.</Text>
+          </View>
+        </Section>
+      )}
+
+      <Section title="Quick Actions" icon={Heart} tint={currentColors.primary}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRow}>
+          <QuickAction title="Log Workout" icon={Activity} color={currentColors.primary} testID="qa-workout" />
+          <QuickAction title="Add Meal" icon={Apple} color={currentColors.accent} testID="qa-meal" />
+          <QuickAction title="Track Sleep" icon={Moon} color={colors.light.purple} testID="qa-sleep" />
+          <QuickAction title="Check Heart" icon={Heart} color={currentColors.error} testID="qa-heart" />
         </ScrollView>
-      </View>
+      </Section>
+
+      <View style={{ height: 32 }} />
     </Animated.ScrollView>
+  );
+}
+
+type KPIProps = { color: string; bg: string; icon: any; label: string; value: string; testID?: string };
+function KPI({ color, bg, icon: Icon, label, value, testID }: KPIProps) {
+  return (
+    <View style={[styles.kpi, { backgroundColor: bg }]} testID={testID}>
+      <View style={[styles.kpiIcon, { backgroundColor: color }]}>
+        <Icon size={16} color="#fff" />
+      </View>
+      <Text style={[styles.kpiLabel]}>{label}</Text>
+      <Text style={[styles.kpiValue]}>{value}</Text>
+    </View>
+  );
+}
+
+type SectionProps = { title: string; icon: any; tint: string; children: React.ReactNode };
+function Section({ title, icon: Icon, tint, children }: SectionProps) {
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <View style={[styles.sectionBadge, { backgroundColor: `${tint}22` }]}> 
+          <Icon size={16} color={tint} />
+        </View>
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      {children}
+    </View>
+  );
+}
+
+type MacroProps = { title: string; value: string; color: string };
+function Macro({ title, value, color }: MacroProps) {
+  return (
+    <View style={styles.macro}>
+      <Text style={styles.macroTitle}>{title}</Text>
+      <Text style={[styles.macroValue, { color }]}>{value}</Text>
+    </View>
+  );
+}
+
+type QuickProps = { title: string; icon: any; color: string; testID?: string };
+function QuickAction({ title, icon: Icon, color, testID }: QuickProps) {
+  return (
+    <AnimatedPressable style={[styles.quick, { borderColor: `${color}55` }]} onPress={() => console.log("[Dashboard] quick", title)} testID={testID}>
+      <View style={[styles.quickIcon, { backgroundColor: `${color}22` }]}> 
+        <Icon size={18} color={color} />
+      </View>
+      <Text style={styles.quickText}>{title}</Text>
+    </AnimatedPressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  heroWrapper: { paddingHorizontal: 16, paddingTop: 16 },
-  heroMedia: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    height: 240,
-    backgroundColor: '#111827',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  video: { width: '100%', height: '100%' },
-  overlay: { ...StyleSheet.absoluteFillObject },
-  heroContent: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    bottom: 20,
-  },
-  kicker: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginBottom: 8 },
-  heroTitle: { color: 'white', fontSize: 28, fontWeight: 'bold' as const },
-  heroSub: { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginTop: 4 },
+  headerBg: { height: 120 },
+  headerRow: { paddingHorizontal: 16, marginTop: -100, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headerLeft: { flexDirection: "column" },
+  kicker: { fontSize: 12 },
+  title: { fontSize: 28, fontWeight: "700" as const },
+  chip: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+  chipText: { fontSize: 12 },
 
-  section: { marginTop: 28, paddingHorizontal: 16 },
-  sectionAlt: { marginTop: 16, paddingHorizontal: 16 },
-  sectionTitle: { fontSize: 20, fontWeight: '600' as const, marginBottom: 16 },
+  kpiRow: { flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: 16 },
+  kpi: { flex: 1, padding: 16, borderRadius: 16 },
+  kpiIcon: { width: 28, height: 28, borderRadius: 8, justifyContent: "center", alignItems: "center", marginBottom: 8 },
+  kpiLabel: { fontSize: 12, color: "#6B7280" },
+  kpiValue: { fontSize: 20, fontWeight: "700" as const, color: "#111827", marginTop: 2 },
 
-  carouselContainer: { paddingHorizontal: 4 },
-  cardLarge: {
-    width: width * 0.8,
-    height: 200,
-    marginHorizontal: 8,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
-    backgroundColor: '#0B1220',
-  },
-  cardImage: { width: '100%', height: '100%' },
-  cardGradient: { ...StyleSheet.absoluteFillObject },
-  cardTextWrap: { position: 'absolute', left: 16, right: 16, bottom: 14 },
-  cardTitle: { color: 'white', fontSize: 18, fontWeight: '700' as const },
-  cardSubtitle: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginTop: 2 },
+  section: { marginTop: 24, paddingHorizontal: 16 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  sectionBadge: { width: 32, height: 32, borderRadius: 8, justifyContent: "center", alignItems: "center", marginRight: 10 },
+  sectionTitle: { fontSize: 18, fontWeight: "600" as const },
 
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    gap: 16,
-    marginTop: 20,
-  },
-  statCard: {
-    width: cardWidth,
-    padding: 16,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statTitle: { fontSize: 12, marginBottom: 4 },
-  statValue: { fontSize: 24, fontWeight: 'bold' as const, marginBottom: 2 },
-  statTarget: { fontSize: 12, marginBottom: 8 },
-  progressBar: { height: 4, borderRadius: 2, overflow: 'hidden' },
+  bars: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", height: 120, paddingHorizontal: 4 },
+  barWrap: { flex: 1, alignItems: "center" },
+  bar: { width: 14, borderRadius: 6 },
 
-  quickActionsContainer: { paddingRight: 16, gap: 12 },
-  quickAction: {
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    width: 100,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  quickActionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  quickActionText: { fontSize: 12, textAlign: 'center' },
+  goalsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  goalCard: { width: cardWidth, padding: 14, borderRadius: 14 },
+  goalIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center", marginBottom: 8 },
+  goalTitle: { fontSize: 14, fontWeight: "600" as const },
+  goalMeta: { fontSize: 12, marginTop: 2 },
+  progressTrack: { height: 6, borderRadius: 3, overflow: "hidden", marginTop: 10 },
+  progressFill: { height: "100%", borderRadius: 3 },
 
-  insightCard: {
-    marginTop: 12,
-    padding: 16,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  insightGradient: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  insightContent: { flex: 1 },
-  insightTitle: { fontSize: 16, fontWeight: '600' as const, marginBottom: 4 },
-  insightText: { fontSize: 14 },
+  nutritionRow: { flexDirection: "row", gap: 12 },
+  macro: { flex: 1, backgroundColor: "#0F172A0D", borderRadius: 12, padding: 12 },
+  macroTitle: { fontSize: 12, color: "#6B7280" },
+  macroValue: { fontSize: 18, fontWeight: "700" as const, marginTop: 2 },
 
-  errorBanner: {
-    marginTop: 12,
-    marginHorizontal: 16,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-  },
+  activityItem: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1 },
+  activityIcon: { width: 32, height: 32, borderRadius: 8, justifyContent: "center", alignItems: "center", marginRight: 12 },
+  activityText: { flex: 1 },
+  activityTitle: { fontSize: 14, fontWeight: "600" as const },
+  activityMeta: { fontSize: 12 },
+
+  sleepCard: { padding: 16, borderRadius: 16 },
+  sleepTag: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+  sleepTagText: { fontSize: 12 },
+  sleepHours: { fontSize: 28, fontWeight: "700" as const, marginTop: 10 },
+  sleepMeta: { fontSize: 12, marginTop: 2 },
+
+  waterRow: { flexDirection: "row", gap: 8 },
+  cup: { width: 28, height: 36, borderRadius: 8, borderWidth: 1 },
+
+  quickRow: { paddingRight: 16, gap: 12 },
+  quick: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, marginRight: 8 },
+  quickIcon: { width: 28, height: 28, borderRadius: 8, justifyContent: "center", alignItems: "center" },
+  quickText: { fontSize: 12, fontWeight: "600" as const },
+
+  errorBanner: { marginTop: 12, marginHorizontal: 16, borderRadius: 12, padding: 12, borderWidth: 1 },
   errorBannerText: { fontSize: 13 },
-  statServerHint: { fontSize: 12, marginTop: 4 },
+  insightItem: { marginTop: 8, padding: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  insightText: { fontSize: 13, flex: 1 },
 });
