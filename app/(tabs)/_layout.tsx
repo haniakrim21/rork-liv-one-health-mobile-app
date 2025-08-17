@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Home, User } from "lucide-react-native";
+import { Home, User, Briefcase } from "lucide-react-native";
 import React from "react";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
@@ -36,6 +36,13 @@ export default function TabLayout() {
         options={{
           title: "Dashboard",
           tabBarIcon: ({ color }) => <Home size={24} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="services"
+        options={{
+          title: "Services",
+          tabBarIcon: ({ color }) => <Briefcase size={24} color={color} />,
         }}
       />
       <Tabs.Screen
