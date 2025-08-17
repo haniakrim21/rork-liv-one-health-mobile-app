@@ -163,7 +163,7 @@ export default function DashboardScreen() {
           <Macro title="Calories" value={`${nutrition.calories}`} color={currentColors.accent} />
           <Macro title="Protein" value={`${nutrition.protein}g`} color={currentColors.primary} />
           <Macro title="Carbs" value={`${nutrition.carbs}g`} color={currentColors.info} />
-          <Macro title="Fat" value={`${nutrition.fat}g`} color={colors.light.purple} />
+          <Macro title="Fat" value={`${nutrition.fat}g`} color={currentColors.purple} />
         </View>
       </Section>
 
@@ -182,11 +182,11 @@ export default function DashboardScreen() {
         ))}
       </Section>
 
-      <Section title="Sleep" icon={Bed} tint={colors.light.purple}>
+      <Section title="Sleep" icon={Bed} tint={currentColors.purple}>
         <GlassView style={styles.sleepCard}> 
-          <View style={[styles.sleepTag, { backgroundColor: `${colors.light.purple}22` }]}>
-            <Moon size={16} color={colors.light.purple} />
-            <Text style={[styles.sleepTagText, { color: colors.light.purple }]}>Quality {sleepData?.quality ?? 80}%</Text>
+          <View style={[styles.sleepTag, { backgroundColor: `${currentColors.purple}22` }]}>
+            <Moon size={16} color={currentColors.purple} />
+            <Text style={[styles.sleepTagText, { color: currentColors.purple }]}>Quality {sleepData?.quality ?? 80}%</Text>
           </View>
           <Text style={[styles.sleepHours, { color: currentColors.text }]}>{dailyStats.sleep}h</Text>
           <Text style={[styles.sleepMeta, { color: currentColors.textSecondary }]}>Bed {sleepData?.bedtime ?? "--:--"} • Wake {sleepData?.wakeTime ?? "--:--"}</Text>
@@ -219,7 +219,7 @@ export default function DashboardScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRow}>
           <QuickAction title="Log Workout" icon={Activity} color={currentColors.primary} testID="qa-workout" />
           <QuickAction title="Add Meal" icon={Apple} color={currentColors.accent} testID="qa-meal" />
-          <QuickAction title="Track Sleep" icon={Moon} color={colors.light.purple} testID="qa-sleep" />
+          <QuickAction title="Track Sleep" icon={Moon} color={currentColors.purple} testID="qa-sleep" />
           <QuickAction title="Check Heart" icon={Heart} color={currentColors.error} testID="qa-heart" />
         </ScrollView>
       </Section>
@@ -231,26 +231,30 @@ export default function DashboardScreen() {
 
 type KPIProps = { color: string; bg: string; icon: any; label: string; value: string; testID?: string };
 function KPI({ color, bg, icon: Icon, label, value, testID }: KPIProps) {
+  const { theme } = useAppSettings();
+  const palette = colors[theme];
   return (
     <GlassView style={[styles.kpi]} testID={testID}>
       <View style={[styles.kpiIcon, { backgroundColor: color }]}>
         <Icon size={16} color="#fff" />
       </View>
-      <Text style={[styles.kpiLabel]}>{label}</Text>
-      <Text style={[styles.kpiValue]}>{value}</Text>
+      <Text style={[styles.kpiLabel, { color: palette.textSecondary }]}>{label}</Text>
+      <Text style={[styles.kpiValue, { color: palette.text }]}>{value}</Text>
     </GlassView>
   );
 }
 
 type SectionProps = { title: string; icon: any; tint: string; children: React.ReactNode };
 function Section({ title, icon: Icon, tint, children }: SectionProps) {
+  const { theme } = useAppSettings();
+  const palette = colors[theme];
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <View style={[styles.sectionBadge, { backgroundColor: `${tint}22` }]}> 
           <Icon size={16} color={tint} />
         </View>
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={[styles.sectionTitle, { color: palette.text }]}>{title}</Text>
       </View>
       {children}
     </View>
@@ -259,9 +263,11 @@ function Section({ title, icon: Icon, tint, children }: SectionProps) {
 
 type MacroProps = { title: string; value: string; color: string };
 function Macro({ title, value, color }: MacroProps) {
+  const { theme } = useAppSettings();
+  const palette = colors[theme];
   return (
     <View style={styles.macro}>
-      <Text style={styles.macroTitle}>{title}</Text>
+      <Text style={[styles.macroTitle, { color: palette.textSecondary }]}>{title}</Text>
       <Text style={[styles.macroValue, { color }]}>{value}</Text>
     </View>
   );
@@ -269,13 +275,15 @@ function Macro({ title, value, color }: MacroProps) {
 
 type QuickProps = { title: string; icon: any; color: string; testID?: string };
 function QuickAction({ title, icon: Icon, color, testID }: QuickProps) {
+  const { theme } = useAppSettings();
+  const palette = colors[theme];
   return (
     <AnimatedPressable style={styles.quick} onPress={() => console.log("[Dashboard] quick", title)} testID={testID}>
       <GlassView style={styles.quickInner}>
         <View style={[styles.quickIcon, { backgroundColor: `${color}22` }]}> 
           <Icon size={18} color={color} />
         </View>
-        <Text style={styles.quickText}>{title}</Text>
+        <Text style={[styles.quickText, { color: palette.text }]}>{title}</Text>
       </GlassView>
     </AnimatedPressable>
   );
@@ -286,21 +294,21 @@ const styles = StyleSheet.create({
   headerBg: { height: 120 },
   headerRow: { paddingHorizontal: 16, marginTop: -100, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   headerLeft: { flexDirection: "column" },
-  kicker: { fontSize: 12 },
-  title: { fontSize: 28, fontWeight: "700" as const },
+  kicker: { fontSize: 12, letterSpacing: 0.4 },
+  title: { fontSize: 28, fontWeight: "700" as const, lineHeight: 34 },
   chip: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
-  chipText: { fontSize: 12 },
+  chipText: { fontSize: 12, letterSpacing: 0.2 },
 
   kpiRow: { flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: 16 },
   kpi: { flex: 1, padding: 16, borderRadius: 16 },
   kpiIcon: { width: 28, height: 28, borderRadius: 8, justifyContent: "center", alignItems: "center", marginBottom: 8 },
-  kpiLabel: { fontSize: 12, color: "#6B7280" },
-  kpiValue: { fontSize: 20, fontWeight: "700" as const, color: "#111827", marginTop: 2 },
+  kpiLabel: { fontSize: 12 },
+  kpiValue: { fontSize: 20, fontWeight: "700" as const, marginTop: 2 },
 
   section: { marginTop: 24, paddingHorizontal: 16 },
   sectionHeader: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
   sectionBadge: { width: 32, height: 32, borderRadius: 8, justifyContent: "center", alignItems: "center", marginRight: 10 },
-  sectionTitle: { fontSize: 18, fontWeight: "600" as const },
+  sectionTitle: { fontSize: 18, fontWeight: "600" as const, lineHeight: 22 },
 
   bars: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", height: 120, paddingHorizontal: 4 },
   barWrap: { flex: 1, alignItems: "center" },
@@ -316,20 +324,20 @@ const styles = StyleSheet.create({
 
   nutritionRow: { flexDirection: "row", gap: 12 },
   macro: { flex: 1, borderRadius: 12, padding: 12 },
-  macroTitle: { fontSize: 12, color: "#6B7280" },
-  macroValue: { fontSize: 18, fontWeight: "700" as const, marginTop: 2 },
+  macroTitle: { fontSize: 12 },
+  macroValue: { fontSize: 18, fontWeight: "700" as const, marginTop: 2, lineHeight: 22 },
 
   activityItem: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1 },
   activityIcon: { width: 32, height: 32, borderRadius: 8, justifyContent: "center", alignItems: "center", marginRight: 12 },
   activityText: { flex: 1 },
-  activityTitle: { fontSize: 14, fontWeight: "600" as const },
-  activityMeta: { fontSize: 12 },
+  activityTitle: { fontSize: 14, fontWeight: "600" as const, lineHeight: 18 },
+  activityMeta: { fontSize: 12, lineHeight: 16 },
 
   sleepCard: { padding: 16, borderRadius: 16 },
   sleepTag: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   sleepTagText: { fontSize: 12 },
-  sleepHours: { fontSize: 28, fontWeight: "700" as const, marginTop: 10 },
-  sleepMeta: { fontSize: 12, marginTop: 2 },
+  sleepHours: { fontSize: 28, fontWeight: "700" as const, marginTop: 10, lineHeight: 34 },
+  sleepMeta: { fontSize: 12, marginTop: 2, lineHeight: 16 },
 
   waterRow: { flexDirection: "row", gap: 8 },
   cup: { width: 28, height: 36, borderRadius: 8, borderWidth: 1 },
@@ -338,10 +346,10 @@ const styles = StyleSheet.create({
   quick: { marginRight: 8 },
   quickIcon: { width: 28, height: 28, borderRadius: 8, justifyContent: "center", alignItems: "center" },
   quickInner: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12 },
-  quickText: { fontSize: 12, fontWeight: "600" as const },
+  quickText: { fontSize: 12, fontWeight: "600" as const, letterSpacing: 0.2 },
 
   errorBanner: { marginTop: 12, marginHorizontal: 16, borderRadius: 12, padding: 12, borderWidth: 1 },
-  errorBannerText: { fontSize: 13 },
+  errorBannerText: { fontSize: 13, lineHeight: 18 },
   insightItem: { marginTop: 8, padding: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  insightText: { fontSize: 13, flex: 1 },
+  insightText: { fontSize: 13, flex: 1, lineHeight: 18 },
 });
