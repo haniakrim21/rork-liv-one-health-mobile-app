@@ -75,6 +75,10 @@ export default function FeatureDetailsScreen() {
         return;
       }
     }
+    if (slug === "ai-digital-triage" && key === "start-triage") {
+      router.push({ pathname: "/feature/triage" });
+      return;
+    }
   }, [router, slug]);
 
   const next7Days = useMemo(() => {
