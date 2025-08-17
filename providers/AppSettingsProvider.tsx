@@ -13,7 +13,7 @@ interface AppSettings {
 }
 
 export const [AppSettingsProvider, useAppSettings] = createContextHook<AppSettings>(() => {
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>("dark");
   const [language, setLanguage] = useState<Language>("en");
 
   useEffect(() => {
@@ -26,7 +26,9 @@ export const [AppSettingsProvider, useAppSettings] = createContextHook<AppSettin
       const savedLanguage = await AsyncStorage.getItem("language");
       
       if (savedTheme) setTheme(savedTheme as Theme);
+      else await AsyncStorage.setItem("theme", "dark");
       if (savedLanguage) setLanguage(savedLanguage as Language);
+      else await AsyncStorage.setItem("language", "en");
     } catch (error) {
       console.error("Error loading settings:", error);
     }
