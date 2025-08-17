@@ -23,7 +23,15 @@ export default function HistoryScreen() {
   const router = useRouter();
 
   const [form, setForm] = useState<HistoryForm>({ smoking: "", alcohol: "", conditions: "", meds: "", allergies: "", attachments: [] });
-  const canSubmit = useMemo(() => Object.values(form).every((v) => v.trim().length > 0), [form]);
+  const canSubmit = useMemo(() => {
+    return (
+      form.smoking.trim().length > 0 &&
+      form.alcohol.trim().length > 0 &&
+      form.conditions.trim().length > 0 &&
+      form.meds.trim().length > 0 &&
+      form.allergies.trim().length > 0
+    );
+  }, [form.alcohol, form.allergies, form.conditions, form.meds, form.smoking]);
 
   const saveMutation = trpc.services.history.save.useMutation();
 
@@ -33,7 +41,14 @@ export default function HistoryScreen() {
     if (!canSubmit || saveMutation.isPending) return;
     try {
       console.log("[History] submit", form);
-      saveMutation.mutate(form, {
+      const payload = {
+        smoking: form.smoking.trim(),
+        alcohol: form.alcohol.trim(),
+        conditions: form.conditions.trim(),
+        meds: form.meds.trim(),
+        allergies: form.allergies.trim(),
+      };
+      saveMutation.mutate(payload, {
         onSuccess: () => {
           Alert.alert("Saved", "Your health history has been saved.");
           router.back();
