@@ -59,6 +59,7 @@ import type { LucideIcon } from "lucide-react-native";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import GlassView from "@/components/GlassView";
+import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
 const HORIZONTAL_PADDING = 40;
@@ -100,18 +101,24 @@ const FeatureCard = memo(function FeatureCard({
   const elevate = useRef(new Animated.Value(0)).current;
   const appear = useRef(new Animated.Value(0)).current;
 
-  const animateTo = useCallback((to: number) => {
-    Animated.timing(scale, { toValue: to, duration: 120, useNativeDriver: false }).start();
-    Animated.timing(elevate, { toValue: to === 1 ? 0 : 1, duration: 160, useNativeDriver: false }).start();
-  }, [scale, elevate]);
+  const animateTo = useCallback(
+    (to: number) => {
+      Animated.timing(scale, { toValue: to, duration: 120, useNativeDriver: false }).start();
+      Animated.timing(elevate, { toValue: to === 1 ? 0 : 1, duration: 160, useNativeDriver: false }).start();
+    },
+    [scale, elevate]
+  );
 
-  const shadowStyle = useMemo(() => ({
-    shadowColor: feature.color,
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4 + (Platform.OS === 'android' ? 2 : 0),
-  }), [feature.color]);
+  const shadowStyle = useMemo(
+    () => ({
+      shadowColor: feature.color,
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 4 + (Platform.OS === "android" ? 2 : 0),
+    }),
+    [feature.color]
+  );
 
   useEffect(() => {
     const delay = index * 40;
@@ -119,7 +126,10 @@ const FeatureCard = memo(function FeatureCard({
   }, [appear, index]);
 
   const translateY = appear.interpolate({ inputRange: [0, 1], outputRange: [14, 0] });
-  const combinedScale = useMemo(() => Animated.multiply(scale, mount.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] })), [scale, mount]);
+  const combinedScale = useMemo(
+    () => Animated.multiply(scale, mount.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] })),
+    [scale, mount]
+  );
 
   return (
     <TouchableOpacity
@@ -127,7 +137,7 @@ const FeatureCard = memo(function FeatureCard({
       onPress={() => onPress(feature)}
       onPressIn={() => animateTo(0.98)}
       onPressOut={() => animateTo(1)}
-      testID={`feature-${feature.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+      testID={`feature-${feature.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
     >
       <LinearGradient
         colors={[`${feature.color}55`, `${feature.color}22`]}
@@ -137,23 +147,23 @@ const FeatureCard = memo(function FeatureCard({
       >
         <Animated.View style={{ transform: [{ scale: combinedScale }, { translateY }], opacity: appear }}>
           <GlassView style={styles.cardInner}>
-          <View style={[styles.featureIcon, { backgroundColor: `${feature.color}15` }]}> 
-            <feature.icon size={24} color={feature.color} />
-          </View>
-          <Text style={[styles.featureTitle, { color: text.primary }]} numberOfLines={2}>
-            {feature.title}
-          </Text>
-          <Text style={[styles.featureDescription, { color: text.secondary }]} numberOfLines={3}>
-            {feature.description}
-          </Text>
-          {feature.comingSoon && (
-            <View style={styles.pill}>
-              <Text style={styles.pillText}>Coming soon</Text>
+            <View style={[styles.featureIcon, { backgroundColor: `${feature.color}15` }, shadowStyle]}> 
+              <feature.icon size={24} color={feature.color} />
             </View>
-          )}
-          <View style={styles.featureArrow}>
-            <ChevronRight size={16} color={text.secondary} />
-          </View>
+            <Text style={[styles.featureTitle, { color: text.primary }]} numberOfLines={2}>
+              {feature.title}
+            </Text>
+            <Text style={[styles.featureDescription, { color: text.secondary }]} numberOfLines={3}>
+              {feature.description}
+            </Text>
+            {feature.comingSoon && (
+              <View style={styles.pill}>
+                <Text style={styles.pillText}>Coming soon</Text>
+              </View>
+            )}
+            <View style={styles.featureArrow}>
+              <ChevronRight size={16} color={text.secondary} />
+            </View>
           </GlassView>
         </Animated.View>
       </LinearGradient>
@@ -164,6 +174,7 @@ const FeatureCard = memo(function FeatureCard({
 export default function ServicesScreen() {
   const { theme } = useAppSettings();
   const currentColors = colors[theme];
+  const router = useRouter();
 
   const serviceCategories: ServiceCategory[] = [
     {
@@ -552,14 +563,27 @@ export default function ServicesScreen() {
     },
   ];
 
-  const handleFeaturePress = (feature: ServiceFeature) => {
-    console.log("[Services] Feature pressed:", feature.title);
-    if (feature.comingSoon) {
-      console.log(`${feature.title} - Coming Soon!`);
-    } else {
-      console.log(`Opening ${feature.title}`);
-    }
-  };
+  const toSlug = useCallback(
+    (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
+    []
+  );
+
+  const handleFeaturePress = useCallback(
+    (feature: ServiceFeature) => {
+      console.log("[Services] Feature pressed:", feature.title);
+      if (feature.comingSoon) {
+        console.log(`${feature.title} - Coming Soon!`);
+        return;
+      }
+      const slug = toSlug(feature.title);
+      try {
+        router.push({ pathname: "/(tabs)/feature/[slug]", params: { slug } });
+      } catch (e) {
+        console.log("[Services] Navigation error", e);
+      }
+    },
+    [router, toSlug]
+  );
 
   const mount = useRef(new Animated.Value(0)).current;
 
@@ -573,11 +597,16 @@ export default function ServicesScreen() {
       showsVerticalScrollIndicator={false}
       testID="services-scroll"
     >
-      <Animated.View style={[styles.header, { opacity: mount, transform: [{ translateY: mount.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}>
+      <Animated.View
+        style={[
+          styles.header,
+          { opacity: mount, transform: [{ translateY: mount.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] },
+        ]}
+      >
         <Text style={[styles.title, { color: currentColors.text }]} testID="services-title">
           LIV One Services
         </Text>
-        <Text style={[styles.subtitle, { color: currentColors.textSecondary }]}>
+        <Text style={[styles.subtitle, { color: currentColors.textSecondary }]}> 
           Comprehensive health, wellness, and fitness solutions
         </Text>
       </Animated.View>
@@ -681,7 +710,7 @@ const styles = StyleSheet.create({
   featuresGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   cardOuter: {
     width: cardWidth,
@@ -723,16 +752,16 @@ const styles = StyleSheet.create({
     right: 16,
   },
   pill: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#FF9800',
+    alignSelf: "flex-start",
+    backgroundColor: "#FF9800",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
   },
   pillText: {
     fontSize: 10,
-    color: 'white',
-    fontWeight: '600' as const,
+    color: "white",
+    fontWeight: "600" as const,
     letterSpacing: 0.3,
   },
   bottomSpacing: {
