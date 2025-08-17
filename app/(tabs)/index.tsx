@@ -16,6 +16,7 @@ import { useHealthData } from "@/providers/HealthDataProvider";
 import { colors } from "@/constants/colors";
 import AnimatedPressable from "@/components/AnimatedPressable";
 import { trpc } from "@/lib/trpc";
+import GlassView from "@/components/GlassView";
 
 const { width } = Dimensions.get("window");
 const cardWidth = (width - 48) / 2;
@@ -79,10 +80,10 @@ export default function DashboardScreen() {
           <Text style={[styles.kicker, { color: currentColors.textSecondary }]}>Overview</Text>
           <Text style={[styles.title, { color: currentColors.text }]}>Your Dashboard</Text>
         </View>
-        <View style={[styles.chip, { borderColor: currentColors.border }]} testID="date-chip">
+        <GlassView style={styles.chip} testID="date-chip">
           <CalendarDays size={16} color={currentColors.textSecondary} />
           <Text style={[styles.chipText, { color: currentColors.text }]}>{dateLabel}</Text>
-        </View>
+        </GlassView>
       </Animated.View>
 
       <View style={styles.kpiRow}>
@@ -140,15 +141,17 @@ export default function DashboardScreen() {
           {goals.map((g) => {
             const pct = Math.min(100, Math.round(g.current / g.target * 100));
             return (
-              <AnimatedPressable key={g.id} style={[styles.goalCard, { backgroundColor: currentColors.card }]} onPress={() => console.log("[Dashboard] goal", g.id)} testID={`goal-${g.id}`}>
-                <View style={[styles.goalIcon, { backgroundColor: `${g.color}22` }]}>
+              <AnimatedPressable key={g.id} style={[styles.goalCard]} onPress={() => console.log("[Dashboard] goal", g.id)} testID={`goal-${g.id}`}>
+                <GlassView style={styles.goalCard}>
+                  <View style={[styles.goalIcon, { backgroundColor: `${g.color}22` }]}>
                   <Trophy size={18} color={g.color} />
-                </View>
-                <Text style={[styles.goalTitle, { color: currentColors.text }]}>{g.title}</Text>
-                <Text style={[styles.goalMeta, { color: currentColors.textSecondary }]}>{g.current} / {g.target} {g.unit}</Text>
-                <View style={[styles.progressTrack, { backgroundColor: currentColors.border }]}>
+                  </View>
+                  <Text style={[styles.goalTitle, { color: currentColors.text }]}>{g.title}</Text>
+                  <Text style={[styles.goalMeta, { color: currentColors.textSecondary }]}>{g.current} / {g.target} {g.unit}</Text>
+                  <View style={[styles.progressTrack, { backgroundColor: `${currentColors.border}55` }]}>
                   <View style={[styles.progressFill, { width: `${pct}%`, backgroundColor: g.color }]} />
-                </View>
+                  </View>
+                </GlassView>
               </AnimatedPressable>
             );
           })}
@@ -180,14 +183,14 @@ export default function DashboardScreen() {
       </Section>
 
       <Section title="Sleep" icon={Bed} tint={colors.light.purple}>
-        <View style={[styles.sleepCard, { backgroundColor: currentColors.card }]}> 
+        <GlassView style={styles.sleepCard}> 
           <View style={[styles.sleepTag, { backgroundColor: `${colors.light.purple}22` }]}>
             <Moon size={16} color={colors.light.purple} />
             <Text style={[styles.sleepTagText, { color: colors.light.purple }]}>Quality {sleepData?.quality ?? 80}%</Text>
           </View>
           <Text style={[styles.sleepHours, { color: currentColors.text }]}>{dailyStats.sleep}h</Text>
           <Text style={[styles.sleepMeta, { color: currentColors.textSecondary }]}>Bed {sleepData?.bedtime ?? "--:--"} • Wake {sleepData?.wakeTime ?? "--:--"}</Text>
-        </View>
+        </GlassView>
       </Section>
 
       <Section title="Hydration" icon={Droplets} tint={currentColors.secondary}>
@@ -205,10 +208,10 @@ export default function DashboardScreen() {
         </View>
       ) : (
         <Section title="Insights" icon={Sparkles} tint={currentColors.info}>
-          <View style={[styles.insightItem, { backgroundColor: currentColors.card }]}> 
+          <GlassView style={styles.insightItem}> 
             <TrendingUp size={18} color={currentColors.primary} />
             <Text style={[styles.insightText, { color: currentColors.text }]}>You are on track. {statsQuery.data?.workoutsToday ?? 0} workouts logged today.</Text>
-          </View>
+          </GlassView>
         </Section>
       )}
 
@@ -229,13 +232,13 @@ export default function DashboardScreen() {
 type KPIProps = { color: string; bg: string; icon: any; label: string; value: string; testID?: string };
 function KPI({ color, bg, icon: Icon, label, value, testID }: KPIProps) {
   return (
-    <View style={[styles.kpi, { backgroundColor: bg }]} testID={testID}>
+    <GlassView style={[styles.kpi]} testID={testID}>
       <View style={[styles.kpiIcon, { backgroundColor: color }]}>
         <Icon size={16} color="#fff" />
       </View>
       <Text style={[styles.kpiLabel]}>{label}</Text>
       <Text style={[styles.kpiValue]}>{value}</Text>
-    </View>
+    </GlassView>
   );
 }
 
@@ -267,11 +270,13 @@ function Macro({ title, value, color }: MacroProps) {
 type QuickProps = { title: string; icon: any; color: string; testID?: string };
 function QuickAction({ title, icon: Icon, color, testID }: QuickProps) {
   return (
-    <AnimatedPressable style={[styles.quick, { borderColor: `${color}55` }]} onPress={() => console.log("[Dashboard] quick", title)} testID={testID}>
-      <View style={[styles.quickIcon, { backgroundColor: `${color}22` }]}> 
-        <Icon size={18} color={color} />
-      </View>
-      <Text style={styles.quickText}>{title}</Text>
+    <AnimatedPressable style={styles.quick} onPress={() => console.log("[Dashboard] quick", title)} testID={testID}>
+      <GlassView style={styles.quickInner}>
+        <View style={[styles.quickIcon, { backgroundColor: `${color}22` }]}> 
+          <Icon size={18} color={color} />
+        </View>
+        <Text style={styles.quickText}>{title}</Text>
+      </GlassView>
     </AnimatedPressable>
   );
 }
@@ -283,7 +288,7 @@ const styles = StyleSheet.create({
   headerLeft: { flexDirection: "column" },
   kicker: { fontSize: 12 },
   title: { fontSize: 28, fontWeight: "700" as const },
-  chip: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
   chipText: { fontSize: 12 },
 
   kpiRow: { flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: 16 },
@@ -310,7 +315,7 @@ const styles = StyleSheet.create({
   progressFill: { height: "100%", borderRadius: 3 },
 
   nutritionRow: { flexDirection: "row", gap: 12 },
-  macro: { flex: 1, backgroundColor: "#0F172A0D", borderRadius: 12, padding: 12 },
+  macro: { flex: 1, borderRadius: 12, padding: 12 },
   macroTitle: { fontSize: 12, color: "#6B7280" },
   macroValue: { fontSize: 18, fontWeight: "700" as const, marginTop: 2 },
 
@@ -330,8 +335,9 @@ const styles = StyleSheet.create({
   cup: { width: 28, height: 36, borderRadius: 8, borderWidth: 1 },
 
   quickRow: { paddingRight: 16, gap: 12 },
-  quick: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, marginRight: 8 },
+  quick: { marginRight: 8 },
   quickIcon: { width: 28, height: 28, borderRadius: 8, justifyContent: "center", alignItems: "center" },
+  quickInner: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12 },
   quickText: { fontSize: 12, fontWeight: "600" as const },
 
   errorBanner: { marginTop: 12, marginHorizontal: 16, borderRadius: 12, padding: 12, borderWidth: 1 },

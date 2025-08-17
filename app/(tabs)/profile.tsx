@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -11,12 +11,9 @@ import {
 } from "react-native";
 import {
   User,
-  Settings,
-  Bell,
   Moon,
   Sun,
   Globe,
-  Shield,
   LogOut,
   ChevronRight,
   Save,
@@ -25,6 +22,7 @@ import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import AnimatedPressable from "@/components/AnimatedPressable";
 import { useAuth } from "@/providers/AuthProvider";
+import GlassView from "@/components/GlassView";
 
 export default function ProfileScreen() {
   const { theme, language, toggleTheme, toggleLanguage } = useAppSettings();
@@ -108,31 +106,33 @@ export default function ProfileScreen() {
       showsVerticalScrollIndicator={false}
       testID="profile-scroll"
     >
-      <Animated.View style={[styles.profileCard, { backgroundColor: currentColors.card, opacity: mount, transform: [{ translateY: mount.interpolate({ inputRange: [0,1], outputRange: [16,0] }) }] }]}>
-        <View style={styles.profileAvatar}>
-          <User size={40} color={currentColors.primary} />
-        </View>
-        <Text style={[styles.profileName, { color: currentColors.text }]}>
-          {firstName || lastName ? `${firstName} ${lastName}`.trim() : (language === 'ar' ? 'مستخدم' : 'User')}
-        </Text>
-        <Text style={[styles.profileEmail, { color: currentColors.textSecondary }]}>
-          {email || profile?.phone || ''}
-        </Text>
-        <View style={styles.profileBadges} testID="auth-badges">
-          <View style={[styles.badge, { backgroundColor: token ? `${currentColors.success}22` : `${currentColors.error}22` }]}>
-            <Text style={[styles.badgeText, { color: token ? currentColors.success : currentColors.error }]}>
-              {token ? 'Signed In' : 'Signed Out'}
-            </Text>
+      <Animated.View style={[{ opacity: mount, transform: [{ translateY: mount.interpolate({ inputRange: [0,1], outputRange: [16,0] }) }] }]}>
+        <GlassView style={styles.profileCard}>
+          <View style={styles.profileAvatar}>
+            <User size={40} color={currentColors.primary} />
           </View>
-          <View style={[styles.badge, { backgroundColor: absherVerified ? `${currentColors.success}22` : `${currentColors.warning}22` }]}>
-            <Text style={[styles.badgeText, { color: absherVerified ? currentColors.success : currentColors.warning }]}>
-              {absherVerified ? 'Absher Verified' : 'Absher Pending'}
-            </Text>
+          <Text style={[styles.profileName, { color: currentColors.text }]}>
+            {firstName || lastName ? `${firstName} ${lastName}`.trim() : (language === 'ar' ? 'مستخدم' : 'User')}
+          </Text>
+          <Text style={[styles.profileEmail, { color: currentColors.textSecondary }]}>
+            {email || profile?.phone || ''}
+          </Text>
+          <View style={styles.profileBadges} testID="auth-badges">
+            <View style={[styles.badge, { backgroundColor: token ? `${currentColors.success}22` : `${currentColors.error}22` }]}>
+              <Text style={[styles.badgeText, { color: token ? currentColors.success : currentColors.error }]}>
+                {token ? 'Signed In' : 'Signed Out'}
+              </Text>
+            </View>
+            <View style={[styles.badge, { backgroundColor: absherVerified ? `${currentColors.success}22` : `${currentColors.warning}22` }]}>
+              <Text style={[styles.badgeText, { color: absherVerified ? currentColors.success : currentColors.warning }]}>
+                {absherVerified ? 'Absher Verified' : 'Absher Pending'}
+              </Text>
+            </View>
           </View>
-        </View>
+        </GlassView>
       </Animated.View>
 
-      <View style={[styles.groupCard, { backgroundColor: currentColors.card }]}>
+      <GlassView style={styles.groupCard}>
         <View style={[styles.formRow, { borderBottomColor: currentColors.border }]}>
           <Text style={[styles.formLabel, { color: currentColors.textSecondary }]}>First Name</Text>
           <TextInput
@@ -180,21 +180,23 @@ export default function ProfileScreen() {
           />
         </View>
         <AnimatedPressable
-          style={[styles.saveButton, { backgroundColor: currentColors.primary }]}
+          style={{}}
           onPress={onSaveProfile}
           testID="btn-save-profile"
         >
-          <Save size={18} color="#fff" />
-          <Text style={styles.saveText}>Save</Text>
+          <GlassView style={[styles.saveButton]}> 
+            <Save size={18} color={currentColors.text} />
+            <Text style={[styles.saveText, { color: currentColors.text }]}>Save</Text>
+          </GlassView>
         </AnimatedPressable>
-      </View>
+      </GlassView>
 
       {settingsGroups.map((group, groupIndex) => (
         <Animated.View key={groupIndex} style={[styles.settingsGroup, { opacity: mount, transform: [{ translateY: mount.interpolate({ inputRange: [0,1], outputRange: [24 + groupIndex * 4, 0] }) }] }]}>
           <Text style={[styles.groupTitle, { color: currentColors.textSecondary }]}>
             {group.title}
           </Text>
-          <View style={[styles.groupCard, { backgroundColor: currentColors.card }]}>
+          <GlassView style={styles.groupCard}>
             {group.items.map((item, itemIndex) => (
               item.type === "button" ? (
                 <AnimatedPressable
@@ -265,17 +267,19 @@ export default function ProfileScreen() {
                 </View>
               )
             ))}
-          </View>
+          </GlassView>
         </Animated.View>
       ))}
 
       <AnimatedPressable
-        style={[styles.logoutButton, { borderColor: "#E91E63" }]}
+        style={{ marginHorizontal: 20, marginBottom: 40 }}
         onPress={async () => { await signOut(); Alert.alert("Signed out", "See you soon"); }}
         testID="logout-button"
       >
-        <LogOut size={20} color="#E91E63" />
-        <Text style={styles.logoutText}>Sign Out</Text>
+        <GlassView style={styles.logoutButton}>
+          <LogOut size={20} color="#E91E63" />
+          <Text style={styles.logoutText}>Sign Out</Text>
+        </GlassView>
       </AnimatedPressable>
     </Animated.ScrollView>
   );
@@ -290,11 +294,6 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 20,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   profileAvatar: {
     width: 80,
@@ -341,11 +340,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     borderRadius: 16,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
   },
   formRow: {
     paddingHorizontal: 16,
@@ -358,11 +352,12 @@ const styles = StyleSheet.create({
   },
   formInput: {
     borderWidth: 1,
-    borderColor: "#00000010",
+    borderColor: "#FFFFFF22",
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
+    backgroundColor: 'transparent',
   },
   settingItem: {
     flexDirection: "row",
@@ -402,11 +397,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    marginHorizontal: 20,
-    marginBottom: 40,
     padding: 16,
     borderRadius: 12,
-    borderWidth: 1,
   },
   logoutText: {
     fontSize: 16,

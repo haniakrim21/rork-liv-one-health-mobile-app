@@ -58,6 +58,7 @@ import {
 import type { LucideIcon } from "lucide-react-native";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
+import GlassView from "@/components/GlassView";
 
 const { width } = Dimensions.get("window");
 const HORIZONTAL_PADDING = 40;
@@ -134,13 +135,8 @@ const FeatureCard = memo(function FeatureCard({
         end={{ x: 1, y: 1 }}
         style={styles.cardOuter}
       >
-        <Animated.View
-          style={[
-            styles.cardInner,
-            { backgroundColor: background, transform: [{ scale: combinedScale }, { translateY }], opacity: appear },
-            shadowStyle,
-          ]}
-        >
+        <Animated.View style={{ transform: [{ scale: combinedScale }, { translateY }], opacity: appear }}>
+          <GlassView style={styles.cardInner}>
           <View style={[styles.featureIcon, { backgroundColor: `${feature.color}15` }]}> 
             <feature.icon size={24} color={feature.color} />
           </View>
@@ -158,6 +154,7 @@ const FeatureCard = memo(function FeatureCard({
           <View style={styles.featureArrow}>
             <ChevronRight size={16} color={text.secondary} />
           </View>
+          </GlassView>
         </Animated.View>
       </LinearGradient>
     </TouchableOpacity>
@@ -697,8 +694,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     position: "relative",
     minHeight: 150,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
   },
   comingSoonCard: {
     opacity: 0.7,
