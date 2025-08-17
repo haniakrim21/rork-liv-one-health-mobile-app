@@ -32,6 +32,7 @@ import { useHealthData } from "@/providers/HealthDataProvider";
 import { colors } from "@/constants/colors";
 import { trpc } from "@/lib/trpc";
 import GlassView from "@/components/GlassView";
+import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
 const HORIZONTAL_PADDING = 40;
@@ -210,8 +211,12 @@ export default function DashboardScreen() {
     },
   ], [currentColors.accent, currentColors.error, currentColors.info, currentColors.primary, currentColors.purple, currentColors.secondary, dailyStats.calories, dailyStats.sleep, dailyStats.steps, dailyStats.water, goals, nutrition.calories, nutrition.carbs, nutrition.fat, nutrition.protein, sleepData?.bedtime, sleepData?.quality, sleepData?.wakeTime, statsQuery.data?.workoutsToday, statsQuery.error]);
 
+  const router = useRouter();
+
   const handlePress = (f: DashFeature) => {
     console.log("[Dashboard] tile press", f.title);
+    const slug = f.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    router.push({ pathname: "/(tabs)/feature/[slug]", params: { slug } });
   };
 
   return (
