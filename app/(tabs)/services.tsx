@@ -59,6 +59,7 @@ import type { LucideIcon } from "lucide-react-native";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import GlassView from "@/components/GlassView";
+import NextSteps from "@/components/NextSteps";
 import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
@@ -647,6 +648,8 @@ export default function ServicesScreen() {
           </View>
         </View>
       ))}
+
+      <NextSteps testID="services-next-steps" />
 
       <View style={styles.bottomSpacing} />
     </ScrollView>

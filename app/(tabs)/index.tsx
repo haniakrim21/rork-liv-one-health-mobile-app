@@ -32,6 +32,7 @@ import { useHealthData } from "@/providers/HealthDataProvider";
 import { colors } from "@/constants/colors";
 import { trpc } from "@/lib/trpc";
 import GlassView from "@/components/GlassView";
+import NextSteps from "@/components/NextSteps";
 import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
@@ -271,6 +272,8 @@ export default function DashboardScreen() {
           </View>
         </View>
       ))}
+
+      <NextSteps testID="dashboard-next-steps" />
 
       <View style={styles.bottomSpacing} />
     </ScrollView>

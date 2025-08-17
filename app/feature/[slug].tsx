@@ -5,6 +5,7 @@ import { ChevronLeft, Sparkles, Calendar, Video, ClipboardList, Stethoscope, Bra
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import GlassView from "@/components/GlassView";
+import NextSteps from "@/components/NextSteps";
 
 function toTitle(slug: string): string {
   return slug
@@ -677,11 +678,7 @@ export default function FeatureDetailsScreen() {
           ))}
         </GlassView>
 
-        <GlassView style={styles.card} testID="feature-next">
-          <Text style={[styles.cardTitle, { color: palette.text }]}>Next steps</Text>
-          <Text style={[styles.cardBody, { color: palette.textSecondary }]}>This screen will evolve with deeper flows, server APIs, and validation. For now, explore the actions above.
-          </Text>
-        </GlassView>
+        <NextSteps testID="feature-next" />
       </View>
     </View>
   );

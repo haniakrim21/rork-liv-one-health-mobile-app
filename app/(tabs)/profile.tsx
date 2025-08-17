@@ -23,6 +23,7 @@ import { colors } from "@/constants/colors";
 import AnimatedPressable from "@/components/AnimatedPressable";
 import { useAuth } from "@/providers/AuthProvider";
 import GlassView from "@/components/GlassView";
+import NextSteps from "@/components/NextSteps";
 
 export default function ProfileScreen() {
   const { theme, language, toggleTheme, toggleLanguage } = useAppSettings();
@@ -270,6 +271,8 @@ export default function ProfileScreen() {
           </GlassView>
         </Animated.View>
       ))}
+
+      <NextSteps testID="profile-next-steps" />
 
       <AnimatedPressable
         style={{ marginHorizontal: 20, marginBottom: 40 }}
