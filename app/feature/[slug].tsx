@@ -6,6 +6,7 @@ import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import GlassView from "@/components/GlassView";
 import NextSteps from "@/components/NextSteps";
+import Attachments, { Attachment } from "@/components/Attachments";
 
 function toTitle(slug: string): string {
   return slug
@@ -26,6 +27,7 @@ export default function FeatureDetailsScreen() {
   const router = useRouter();
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const actions: ActionItem[] = useMemo(() => {
     if (slug === "appointment-booking") {
@@ -679,6 +681,13 @@ export default function FeatureDetailsScreen() {
         </GlassView>
 
         <NextSteps testID="feature-next" />
+
+        <Attachments
+          title="Attachments"
+          initial={attachments}
+          onChange={setAttachments}
+          testID="feature-attachments"
+        />
       </View>
     </View>
   );

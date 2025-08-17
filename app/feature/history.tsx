@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView, Alert 
 import { useRouter } from "expo-router";
 import { ChevronLeft, ClipboardList, Check } from "lucide-react-native";
 import GlassView from "@/components/GlassView";
+import Attachments, { Attachment } from "@/components/Attachments";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import { trpc } from "@/lib/trpc";
@@ -13,6 +14,7 @@ interface HistoryForm {
   conditions: string;
   meds: string;
   allergies: string;
+  attachments: Attachment[];
 }
 
 export default function HistoryScreen() {
@@ -20,7 +22,7 @@ export default function HistoryScreen() {
   const palette = colors[theme];
   const router = useRouter();
 
-  const [form, setForm] = useState<HistoryForm>({ smoking: "", alcohol: "", conditions: "", meds: "", allergies: "" });
+  const [form, setForm] = useState<HistoryForm>({ smoking: "", alcohol: "", conditions: "", meds: "", allergies: "", attachments: [] });
   const canSubmit = useMemo(() => Object.values(form).every((v) => v.trim().length > 0), [form]);
 
   const saveMutation = trpc.services.history.save.useMutation();
@@ -131,7 +133,14 @@ export default function HistoryScreen() {
             />
           </View>
 
-          <TouchableOpacity onPress={onSubmit} disabled={!canSubmit || saveMutation.isPending} style={[styles.primaryBtn, { backgroundColor: canSubmit && !saveMutation.isPending ? palette.primary : `${palette.text}20` }]} testID="history-submit">
+          <Attachments
+  title="Attachments"
+  initial={form.attachments}
+  onChange={(list) => setForm((p) => ({ ...p, attachments: list }))}
+  testID="history-attachments"
+/>
+
+<TouchableOpacity onPress={onSubmit} disabled={!canSubmit || saveMutation.isPending} style={[styles.primaryBtn, { backgroundColor: canSubmit && !saveMutation.isPending ? palette.primary : `${palette.text}20` }]} testID="history-submit">
             <Check size={16} color={palette.background} />
             <Text style={[styles.primaryBtnText, { color: palette.background }]}>{saveMutation.isPending ? "Saving..." : "Save"}</Text>
           </TouchableOpacity>
