@@ -9,6 +9,7 @@ import availability from "@/backend/trpc/routes/services/availability/route";
 import book from "@/backend/trpc/routes/services/book/route";
 import medsList from "@/backend/trpc/routes/services/meds/list/route";
 import medsAdd from "@/backend/trpc/routes/services/meds/add/route";
+import historySave from "@/backend/trpc/routes/services/history/save/route";
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
@@ -29,6 +30,9 @@ export const appRouter = createTRPCRouter({
     meds: createTRPCRouter({
       list: medsList,
       add: medsAdd,
+    }),
+    history: createTRPCRouter({
+      save: historySave,
     }),
   }),
 });

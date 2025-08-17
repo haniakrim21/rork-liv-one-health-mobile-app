@@ -1,10 +1,10 @@
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { StyleSheet, Text, View, TouchableOpacity, TextInput, FlatList } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import GlassView from "@/components/GlassView";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
-import { Pill, Plus, ChevronLeft } from "lucide-react-native";
+import { Pill, ChevronLeft } from "lucide-react-native";
 import { trpc } from "@/lib/trpc";
 
 export default function MedsScreen() {
@@ -19,16 +19,33 @@ export default function MedsScreen() {
   const [name, setName] = useState<string>("");
   const [dose, setDose] = useState<string>("");
   const [schedule, setSchedule] = useState<string>("");
+  const [errors, setErrors] = useState<{ name?: string; dose?: string; schedule?: string }>({});
+
+  useEffect(() => {
+    if (add === "1") {
+      // focus flow hint; could auto focus first field via refs if needed
+    }
+  }, [add]);
+
+  const validate = useCallback(() => {
+    const e: { name?: string; dose?: string; schedule?: string } = {};
+    if (name.trim().length === 0) e.name = "Required";
+    if (dose.trim().length === 0) e.dose = "Required";
+    if (schedule.trim().length === 0) e.schedule = "Required";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }, [dose, name, schedule]);
 
   const canAdd = useMemo(() => name.trim().length > 0 && dose.trim().length > 0 && schedule.trim().length > 0, [dose, name, schedule]);
 
   const onAdd = useCallback(() => {
-    if (!canAdd) return;
+    if (!validate()) return;
     addMutation.mutate({ name: name.trim(), dose: dose.trim(), schedule: schedule.trim() });
     setName("");
     setDose("");
     setSchedule("");
-  }, [addMutation, canAdd, dose, name, schedule]);
+    setErrors({});
+  }, [addMutation, dose, name, schedule, validate]);
 
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]}>
@@ -49,30 +66,33 @@ export default function MedsScreen() {
             placeholder="Name"
             placeholderTextColor={`${palette.text}70`}
             value={name}
-            onChangeText={setName}
-            style={[styles.input, { color: palette.text, borderColor: `${palette.text}20` }]}
+            onChangeText={(t) => { setName(t); if (errors.name) setErrors((p) => ({ ...p, name: undefined })); }}
+            style={[styles.input, { color: palette.text, borderColor: errors.name ? "#ff6b6b" : `${palette.text}20` }]}
             testID="med-name"
           />
+          {!!errors.name && <Text style={[styles.errorText, { color: "#ff6b6b" }]}>{errors.name}</Text>}
         </View>
         <View style={styles.row}> 
           <TextInput
             placeholder="Dose (e.g., 10mg)"
             placeholderTextColor={`${palette.text}70`}
             value={dose}
-            onChangeText={setDose}
-            style={[styles.input, { color: palette.text, borderColor: `${palette.text}20` }]}
+            onChangeText={(t) => { setDose(t); if (errors.dose) setErrors((p) => ({ ...p, dose: undefined })); }}
+            style={[styles.input, { color: palette.text, borderColor: errors.dose ? "#ff6b6b" : `${palette.text}20` }]}
             testID="med-dose"
           />
+          {!!errors.dose && <Text style={[styles.errorText, { color: "#ff6b6b" }]}>{errors.dose}</Text>}
         </View>
         <View style={styles.row}> 
           <TextInput
             placeholder="Schedule (e.g., 2x daily)"
             placeholderTextColor={`${palette.text}70`}
             value={schedule}
-            onChangeText={setSchedule}
-            style={[styles.input, { color: palette.text, borderColor: `${palette.text}20` }]}
+            onChangeText={(t) => { setSchedule(t); if (errors.schedule) setErrors((p) => ({ ...p, schedule: undefined })); }}
+            style={[styles.input, { color: palette.text, borderColor: errors.schedule ? "#ff6b6b" : `${palette.text}20` }]}
             testID="med-schedule"
           />
+          {!!errors.schedule && <Text style={[styles.errorText, { color: "#ff6b6b" }]}>{errors.schedule}</Text>}
         </View>
         <TouchableOpacity
           onPress={onAdd}
@@ -121,6 +141,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: "700" as const, marginBottom: 8 },
   row: { marginBottom: 8 },
   input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
+  errorText: { fontSize: 11, marginTop: 4 },
   primaryBtn: { marginTop: 8, paddingVertical: 12, borderRadius: 12, alignItems: "center" },
   primaryBtnText: { fontSize: 14, fontWeight: "700" as const },
   medRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10 },

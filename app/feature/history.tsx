@@ -5,6 +5,7 @@ import { ChevronLeft, ClipboardList, Check } from "lucide-react-native";
 import GlassView from "@/components/GlassView";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
+import { trpc } from "@/lib/trpc";
 
 interface HistoryForm {
   smoking: string;
@@ -22,19 +23,29 @@ export default function HistoryScreen() {
   const [form, setForm] = useState<HistoryForm>({ smoking: "", alcohol: "", conditions: "", meds: "", allergies: "" });
   const canSubmit = useMemo(() => Object.values(form).every((v) => v.trim().length > 0), [form]);
 
+  const saveMutation = trpc.services.history.save.useMutation();
+
   const setField = useCallback((k: keyof HistoryForm, v: string) => setForm((p) => ({ ...p, [k]: v })), []);
 
   const onSubmit = useCallback(() => {
-    if (!canSubmit) return;
+    if (!canSubmit || saveMutation.isPending) return;
     try {
       console.log("[History] submit", form);
-      Alert.alert("Saved", "Your health history has been saved.");
-      router.back();
+      saveMutation.mutate(form, {
+        onSuccess: () => {
+          Alert.alert("Saved", "Your health history has been saved.");
+          router.back();
+        },
+        onError: (e) => {
+          console.log("[History] error", e);
+          Alert.alert("Error", "Could not save. Please try again.");
+        },
+      });
     } catch (e) {
       console.log("[History] error", e);
       Alert.alert("Error", "Could not save. Please try again.");
     }
-  }, [canSubmit, form, router]);
+  }, [canSubmit, form, router, saveMutation]);
 
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]} testID="history-screen">
@@ -120,9 +131,9 @@ export default function HistoryScreen() {
             />
           </View>
 
-          <TouchableOpacity onPress={onSubmit} disabled={!canSubmit} style={[styles.primaryBtn, { backgroundColor: canSubmit ? palette.primary : `${palette.text}20` }]} testID="history-submit">
+          <TouchableOpacity onPress={onSubmit} disabled={!canSubmit || saveMutation.isPending} style={[styles.primaryBtn, { backgroundColor: canSubmit && !saveMutation.isPending ? palette.primary : `${palette.text}20` }]} testID="history-submit">
             <Check size={16} color={palette.background} />
-            <Text style={[styles.primaryBtnText, { color: palette.background }]}>Save</Text>
+            <Text style={[styles.primaryBtnText, { color: palette.background }]}>{saveMutation.isPending ? "Saving..." : "Save"}</Text>
           </TouchableOpacity>
         </GlassView>
       </ScrollView>

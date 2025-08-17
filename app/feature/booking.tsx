@@ -81,6 +81,8 @@ export default function BookingScreen() {
             <Text style={{ color: palette.textSecondary }}>Loading times...</Text>
           ) : availabilityQuery.error ? (
             <Text style={{ color: palette.textSecondary }}>Failed to load times</Text>
+          ) : times.length === 0 ? (
+            <Text style={{ color: palette.textSecondary }}>No times available. Pick another day.</Text>
           ) : null}
           <FlatList
             horizontal
