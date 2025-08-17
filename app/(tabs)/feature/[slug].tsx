@@ -1,7 +1,7 @@
-import React, { useMemo } from "react";
-import { StyleSheet, Text, View, TouchableOpacity, Animated } from "react-native";
+import React, { useMemo, useState, useCallback } from "react";
+import { StyleSheet, Text, View, TouchableOpacity, Animated, FlatList } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, Sparkles } from "lucide-react-native";
+import { ChevronLeft, Sparkles, Calendar, Video, ClipboardList, Stethoscope, Brain, ShieldCheck, Link, Pill, Target } from "lucide-react-native";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import GlassView from "@/components/GlassView";
@@ -13,6 +13,8 @@ function toTitle(slug: string): string {
     .join(" ");
 }
 
+type ActionItem = { key: string; title: string; subtitle: string; icon: React.ReactNode };
+
 export default function FeatureDetailsScreen() {
   const { slug: raw } = useLocalSearchParams<{ slug?: string }>();
   const slug = typeof raw === "string" ? raw : Array.isArray(raw) ? raw[0] : "feature";
@@ -21,6 +23,60 @@ export default function FeatureDetailsScreen() {
   const { theme } = useAppSettings();
   const palette = colors[theme];
   const router = useRouter();
+
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const actions: ActionItem[] = useMemo(() => {
+    if (slug === "appointment-booking") {
+      return [
+        { key: "book-virtual", title: "Book Virtual Visit", subtitle: "Video in 15 min", icon: <Video size={18} color={palette.primary} /> },
+        { key: "book-inclinic", title: "Book In-Clinic", subtitle: "Nearest location", icon: <Calendar size={18} color={palette.primary} /> },
+        { key: "bring-records", title: "Attach Health History", subtitle: "Speed up your visit", icon: <ClipboardList size={18} color={palette.primary} /> },
+      ];
+    }
+    if (slug === "virtual-consultations") {
+      return [
+        { key: "new-video", title: "Start New Video Call", subtitle: "Connect securely", icon: <Video size={18} color={palette.primary} /> },
+        { key: "choose-specialty", title: "Choose Specialty", subtitle: "Find the right expert", icon: <Stethoscope size={18} color={palette.primary} /> },
+      ];
+    }
+    if (slug === "ai-digital-triage") {
+      return [
+        { key: "start-triage", title: "Start Symptom Check", subtitle: "Takes ~3 minutes", icon: <Brain size={18} color={palette.primary} /> },
+        { key: "privacy", title: "Privacy & Safety", subtitle: "Your data is protected", icon: <ShieldCheck size={18} color={palette.primary} /> },
+      ];
+    }
+    if (slug === "medication-tracking") {
+      return [
+        { key: "add-med", title: "Add Medication", subtitle: "Name, dose, schedule", icon: <Pill size={18} color={palette.primary} /> },
+        { key: "set-reminder", title: "Set Reminder", subtitle: "Never miss a dose", icon: <Calendar size={18} color={palette.primary} /> },
+      ];
+    }
+    return [
+      { key: "learn", title: "Learn About This Feature", subtitle: "Overview and benefits", icon: <Sparkles size={18} color={palette.primary} /> },
+      { key: "connect", title: "Connect Services", subtitle: "Link devices or data", icon: <Link size={18} color={palette.primary} /> },
+    ];
+  }, [palette.primary, slug]);
+
+  const onActionPress = useCallback((key: string) => {
+    console.log("[Feature] action press", slug, key);
+    if (slug === "appointment-booking" && (key === "book-virtual" || key === "book-inclinic")) {
+      const type = key === "book-virtual" ? "virtual" : "inclinic";
+      router.push({ pathname: "/(tabs)/feature/booking", params: { type } });
+      return;
+    }
+  }, [router, slug]);
+
+  const next7Days = useMemo(() => {
+    const out: string[] = [];
+    const now = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+      const iso = d.toISOString().slice(0, 10);
+      out.push(iso);
+    }
+    return out;
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]} testID="feature-screen">
@@ -43,24 +99,69 @@ export default function FeatureDetailsScreen() {
           </View>
           <View style={styles.heroTextWrap}>
             <Text style={[styles.heroTitle, { color: palette.text }]}>{title}</Text>
-            <Text style={[styles.heroSubtitle, { color: palette.textSecondary }]}>Coming to life. Tap actions below.</Text>
+            <Text style={[styles.heroSubtitle, { color: palette.textSecondary }]}>Tap an action to continue</Text>
           </View>
         </View>
       </GlassView>
 
+      {slug === "appointment-booking" && (
+        <GlassView style={styles.card} testID="booking-card">
+          <Text style={[styles.cardTitle, { color: palette.text }]}>Choose a date</Text>
+          <FlatList
+            horizontal
+            data={next7Days}
+            keyExtractor={(d) => d}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.dateList}
+            renderItem={({ item }) => {
+              const isSel = selectedDate === item;
+              return (
+                <TouchableOpacity
+                  style={[styles.datePill, { borderColor: isSel ? palette.primary : `${palette.text}25`, backgroundColor: isSel ? `${palette.primary}20` : "transparent" }]}
+                  onPress={() => setSelectedDate(item)}
+                  testID={`date-${item}`}
+                >
+                  <Text style={{ color: palette.text, fontWeight: "600" as const }}>{item.slice(5)}</Text>
+                </TouchableOpacity>
+              );
+            }}
+          />
+          <TouchableOpacity
+            disabled={!selectedDate}
+            style={[styles.primaryBtn, { backgroundColor: selectedDate ? palette.primary : `${palette.text}20` }]}
+            onPress={() => {
+              console.log("[Booking] continue", selectedDate);
+              if (selectedDate) {
+                router.push({ pathname: "/(tabs)/feature/booking", params: { date: selectedDate, type: "virtual" } });
+              }
+            }}
+            testID="booking-continue"
+          >
+            <Text style={[styles.primaryBtnText, { color: palette.background }]}>{selectedDate ? `Continue – ${selectedDate}` : "Select a date"}</Text>
+          </TouchableOpacity>
+        </GlassView>
+      )}
+
       <View style={styles.cards}>
-        {["Overview", "Actions", "Next Steps"].map((section, i) => (
-          <GlassView key={section} style={styles.card} testID={`feature-card-${i}`}>
-            <Text style={[styles.cardTitle, { color: palette.text }]}>{section}</Text>
-            <Text style={[styles.cardBody, { color: palette.textSecondary }]}>
-              {section === "Overview"
-                ? `This is a placeholder screen for ${title}.`
-                : section === "Actions"
-                ? "We will wire contextual actions here based on the feature."
-                : "Design spec and API wiring will be added in upcoming iterations."}
-            </Text>
-          </GlassView>
-        ))}
+        <GlassView style={styles.card} testID="feature-actions">
+          <Text style={[styles.cardTitle, { color: palette.text }]}>Quick actions</Text>
+          {actions.map((a) => (
+            <TouchableOpacity key={a.key} style={styles.actionRow} onPress={() => onActionPress(a.key)} testID={`action-${a.key}`}>
+              <View style={[styles.actionIcon, { backgroundColor: `${palette.primary}12` }]}>{a.icon}</View>
+              <View style={styles.actionTextWrap}>
+                <Text style={[styles.actionTitle, { color: palette.text }]}>{a.title}</Text>
+                <Text style={[styles.actionSubtitle, { color: palette.textSecondary }]}>{a.subtitle}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </GlassView>
+
+        <GlassView style={styles.card} testID="feature-next">
+          <Text style={[styles.cardTitle, { color: palette.text }]}>Next steps</Text>
+          <Text style={[styles.cardBody, { color: palette.textSecondary }]}>
+            This screen will evolve with deeper flows, server APIs, and validation. For now, explore the actions above.
+          </Text>
+        </GlassView>
       </View>
     </View>
   );
@@ -107,4 +208,13 @@ const styles = StyleSheet.create({
   card: { padding: 16, borderRadius: 16, marginBottom: 12 },
   cardTitle: { fontSize: 16, fontWeight: "700" as const, marginBottom: 6 },
   cardBody: { fontSize: 13, lineHeight: 20 },
+  actionRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10 },
+  actionIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center", marginRight: 12 },
+  actionTextWrap: { flex: 1 },
+  actionTitle: { fontSize: 14, fontWeight: "600" as const },
+  actionSubtitle: { fontSize: 12 },
+  dateList: { paddingVertical: 8 },
+  datePill: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, marginRight: 8 },
+  primaryBtn: { marginTop: 12, paddingVertical: 12, borderRadius: 12, alignItems: "center" },
+  primaryBtnText: { fontSize: 14, fontWeight: "700" as const },
 });
