@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { StyleSheet, Text, View, TouchableOpacity, FlatList, Animated } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { trpc } from "@/lib/trpc";
 import { Calendar, Video, MapPin, ChevronLeft } from "lucide-react-native";
 import GlassView from "@/components/GlassView";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
@@ -10,8 +11,8 @@ export default function BookingScreen() {
   const { theme } = useAppSettings();
   const palette = colors[theme];
   const router = useRouter();
-  const { type: rawType, date: rawDate } = useLocalSearchParams<{ type?: string; date?: string }>();
-  const type = typeof rawType === "string" ? rawType : "virtual";
+  const { type: rawType, date: rawDate } = useLocalSearchParams<{ type?: "virtual" | "inclinic"; date?: string }>();
+  const type: "virtual" | "inclinic" = typeof rawType === "string" ? rawType : "virtual";
   const date = typeof rawDate === "string" ? rawDate : new Date().toISOString().slice(0, 10);
 
   const mount = useRef(new Animated.Value(0)).current;
@@ -19,22 +20,31 @@ export default function BookingScreen() {
     Animated.timing(mount, { toValue: 1, duration: 400, useNativeDriver: false }).start();
   }, [mount]);
 
-  const times: string[] = useMemo(() => [
-    "09:00", "09:30", "10:00", "10:30", "11:00", "13:00", "13:30", "14:00", "15:00", "16:00",
-  ], []);
+  const availabilityQuery = trpc.services.availability.useQuery({ type, date });
+  const times: string[] = useMemo(() => availabilityQuery.data?.times ?? [], [availabilityQuery.data?.times]);
 
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<boolean>(false);
+  const bookMutation = trpc.services.book.useMutation();
 
   const onConfirm = useCallback(() => {
     if (!selectedTime) return;
     setConfirming(true);
-    setTimeout(() => {
-      setConfirming(false);
-      console.log("[Booking] confirmed", { type, date, selectedTime });
-      router.back();
-    }, 700);
-  }, [date, router, selectedTime, type]);
+    bookMutation.mutate(
+      { type, date, time: selectedTime },
+      {
+        onSuccess: (res) => {
+          console.log("[Booking] confirmed", res);
+          setConfirming(false);
+          router.back();
+        },
+        onError: (err) => {
+          console.log("[Booking] error", err);
+          setConfirming(false);
+        },
+      }
+    );
+  }, [bookMutation, date, router, selectedTime, type]);
 
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]} testID="booking-screen">
@@ -67,6 +77,11 @@ export default function BookingScreen() {
 
         <GlassView style={styles.card}>
           <Text style={[styles.cardTitle, { color: palette.text }]}>Select a time</Text>
+          {availabilityQuery.isLoading ? (
+            <Text style={{ color: palette.textSecondary }}>Loading times...</Text>
+          ) : availabilityQuery.error ? (
+            <Text style={{ color: palette.textSecondary }}>Failed to load times</Text>
+          ) : null}
           <FlatList
             horizontal
             data={times}

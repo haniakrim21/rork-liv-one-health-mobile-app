@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { StyleSheet, Text, View, TouchableOpacity, Animated, FlatList } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, Sparkles, Calendar, Video, ClipboardList, Stethoscope, Brain, ShieldCheck, Link, Pill } from "lucide-react-native";
+import { ChevronLeft, Sparkles, Calendar, Video, ClipboardList, Stethoscope, Brain, ShieldCheck, Link, Pill, Plus } from "lucide-react-native";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import GlassView from "@/components/GlassView";
@@ -48,8 +48,8 @@ export default function FeatureDetailsScreen() {
     }
     if (slug === "medication-tracking") {
       return [
-        { key: "add-med", title: "Add Medication", subtitle: "Name, dose, schedule", icon: <Pill size={18} color={palette.primary} /> },
-        { key: "set-reminder", title: "Set Reminder", subtitle: "Never miss a dose", icon: <Calendar size={18} color={palette.primary} /> },
+        { key: "add-med", title: "Add Medication", subtitle: "Name, dose, schedule", icon: <Plus size={18} color={palette.primary} /> },
+        { key: "view-meds", title: "View Medications", subtitle: "Your current list", icon: <Pill size={18} color={palette.primary} /> },
       ];
     }
     return [
@@ -64,6 +64,16 @@ export default function FeatureDetailsScreen() {
       const type = key === "book-virtual" ? "virtual" : "inclinic";
       router.push({ pathname: "/feature/booking", params: { type } });
       return;
+    }
+    if (slug === "medication-tracking") {
+      if (key === "view-meds") {
+        router.push({ pathname: "/feature/meds" });
+        return;
+      }
+      if (key === "add-med") {
+        router.push({ pathname: "/feature/meds", params: { add: "1" } });
+        return;
+      }
     }
   }, [router, slug]);
 
