@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import createContextHook from "@nkzw/create-context-hook";
 
@@ -28,6 +28,24 @@ const TOKEN_KEY = "auth.token";
 const ABSHER_KEY = "auth.absherVerified";
 const PROFILE_KEY = "auth.profile";
 
+const DEFAULT_NAME = "Hani Akrim" as const;
+const DEFAULT_PHONE = "+966500000000" as const;
+
+function buildDefaultProfile(): UserProfile {
+  const [firstName, ...rest] = DEFAULT_NAME.split(" ");
+  const lastName = rest.join(" ") || "";
+  return {
+    firstName,
+    lastName,
+    phone: DEFAULT_PHONE,
+    email: undefined,
+    nationalId: undefined,
+    birthDate: undefined,
+    gender: undefined,
+    avatarUrl: undefined,
+  };
+}
+
 export const [AuthProvider, useAuth] = createContextHook<AuthState>(() => {
   const [token, setTokenState] = useState<string | undefined>(undefined);
   const [absherVerified, setAbsherVerifiedState] = useState<boolean>(false);
@@ -45,9 +63,36 @@ export const [AuthProvider, useAuth] = createContextHook<AuthState>(() => {
         AsyncStorage.getItem(ABSHER_KEY),
         AsyncStorage.getItem(PROFILE_KEY),
       ]);
-      if (t) setTokenState(t);
-      if (a) setAbsherVerifiedState(a === "true");
-      if (p) setProfileState(JSON.parse(p));
+
+      const hasToken = Boolean(t);
+      const hasAbsher = Boolean(a);
+      const hasProfile = Boolean(p);
+
+      if (hasToken) setTokenState(t ?? undefined);
+      if (hasAbsher) setAbsherVerifiedState((a ?? "false") === "true");
+      if (hasProfile && p) setProfileState(JSON.parse(p) as UserProfile);
+
+      if (!hasToken || !hasAbsher || !hasProfile) {
+        console.log("[Auth] Applying defaults for missing keys", { hasToken, hasAbsher, hasProfile });
+        const defaults: Array<Promise<void>> = [];
+
+        if (!hasToken) {
+          const defaultToken = `dev-token-${Date.now()}`;
+          setTokenState(defaultToken);
+          defaults.push(AsyncStorage.setItem(TOKEN_KEY, defaultToken));
+        }
+        if (!hasAbsher) {
+          setAbsherVerifiedState(true);
+          defaults.push(AsyncStorage.setItem(ABSHER_KEY, "true"));
+        }
+        if (!hasProfile) {
+          const defProfile = buildDefaultProfile();
+          setProfileState(defProfile);
+          defaults.push(AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(defProfile)));
+        }
+
+        await Promise.all(defaults);
+      }
     } catch (e) {
       console.error("[Auth] hydrate error", e);
     } finally {
