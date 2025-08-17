@@ -216,7 +216,7 @@ export default function DashboardScreen() {
   const handlePress = (f: DashFeature) => {
     console.log("[Dashboard] tile press", f.title);
     const slug = f.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    router.push({ pathname: "/(tabs)/feature/[slug]", params: { slug } });
+    router.push({ pathname: "/feature/[slug]", params: { slug } });
   };
 
   return (
