@@ -25,6 +25,7 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
   const [items, setItems] = useState<Attachment[]>(initial);
   const [link, setLink] = useState<string>("");
   const [adding, setAdding] = useState<boolean>(false);
+  const [isPicking, setIsPicking] = useState<boolean>(false);
 
   const border = useMemo(() => ({ borderColor: `${palette.text}15` }), [palette.text]);
 
@@ -34,26 +35,51 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
   }, [onChange]);
 
   const addImage = useCallback(async () => {
+    if (isPicking) return;
+    setIsPicking(true);
     try {
       console.log("[Attachments] addImage start");
-      const existing = await ImagePicker.getMediaLibraryPermissionsAsync();
-      let granted = existing.granted;
-      console.log("[Attachments] existing perm", existing);
-      if (!granted) {
-        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        console.log("[Attachments] request perm", perm);
-        granted = perm.granted;
+
+      if (Platform.OS !== 'web') {
+        const existing = await ImagePicker.getMediaLibraryPermissionsAsync();
+        let granted = existing.granted;
+        console.log("[Attachments] existing perm", existing);
+        if (!granted) {
+          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          console.log("[Attachments] request perm", perm);
+          granted = perm.granted;
+        }
+        if (!granted) {
+          Alert.alert("Permission needed", "We need access to your photos to attach images.");
+          return;
+        }
       }
-      if (!granted) {
-        Alert.alert("Permission needed", "We need access to your photos to attach images.");
-        return;
-      }
-      const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.8,
-        selectionLimit: 1,
-      });
+
+      const pickerOptions: ImagePicker.ImagePickerOptions = Platform.select({
+        ios: {
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: false,
+          quality: 0.8,
+          selectionLimit: 1,
+        },
+        android: {
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: false,
+          quality: 0.8,
+        },
+        web: {
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsMultipleSelection: false,
+          quality: 0.8,
+        },
+        default: {
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: false,
+          quality: 0.8,
+        },
+      }) as ImagePicker.ImagePickerOptions;
+
+      const res = await ImagePicker.launchImageLibraryAsync(pickerOptions);
       console.log("[Attachments] picker result", res);
       if (res.canceled) return;
       const asset = res.assets?.[0];
@@ -67,8 +93,10 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
     } catch (e) {
       console.error("[Attachments] addImage error", e);
       Alert.alert("Error", "Could not add image. Please try again.");
+    } finally {
+      setIsPicking(false);
     }
-  }, [items, update]);
+  }, [isPicking, items, update]);
 
   const addLink = useCallback(() => {
     try {
@@ -97,6 +125,11 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
   const open = useCallback(async (att: Attachment) => {
     if (att.type === "link") {
       try {
+        const supported = await Linking.canOpenURL(att.url);
+        if (!supported) {
+          Alert.alert("Invalid URL", "This link cannot be opened on your device.");
+          return;
+        }
         await Linking.openURL(att.url);
       } catch (e) {
         Alert.alert("Error", "Unable to open the link.");
