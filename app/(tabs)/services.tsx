@@ -584,11 +584,19 @@ export default function ServicesScreen() {
       }
       const slug = toSlug(feature.title);
       try {
-        if (slug === "attachments") {
-          router.push("/feature/attachments");
-          return;
+        const routeBySlug: Record<string, string> = {
+          attachments: "/feature/attachments",
+          booking: "/feature/booking",
+          meds: "/feature/meds",
+          triage: "/feature/triage",
+          history: "/feature/history",
+        };
+        const path = routeBySlug[slug];
+        if (path) {
+          router.push(path as any);
+        } else {
+          console.log(`[Services] No route implemented for slug: ${slug}`);
         }
-        router.push({ pathname: "/feature/[slug]", params: { slug } });
       } catch (e) {
         console.log("[Services] Navigation error", e);
       }
