@@ -586,6 +586,9 @@ export default function ServicesScreen() {
       console.log("[Services] Feature pressed:", feature.title);
       if (feature.comingSoon) {
         console.log(`${feature.title} - Coming Soon!`);
+        try {
+          alert(`${feature.title} — coming soon`);
+        } catch (_e) {}
         return;
       }
       try {
@@ -595,6 +598,9 @@ export default function ServicesScreen() {
         }
         const slug = toSlug(feature.title);
         console.log(`[Services] No route implemented for slug: ${slug}`);
+        try {
+          alert(`${feature.title} — not implemented yet`);
+        } catch (_e) {}
       } catch (e) {
         console.log("[Services] Navigation error", e);
       }
