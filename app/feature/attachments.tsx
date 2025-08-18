@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, View, TouchableOpacity, TextInput, FlatList, Image, Alert, Linking, Animated } from "react-native";
-import { useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import GlassView from "@/components/GlassView";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
@@ -75,7 +75,9 @@ export default function AttachmentsScreen() {
   }, []);
 
   return (
-    <View style={[styles.container, { backgroundColor: palette.background }]} testID="attachments-screen">
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={[styles.container, { backgroundColor: palette.background }]} testID="attachments-screen">
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={() => router.back()} testID="attachments-back">
           <View style={[styles.backBtn, { backgroundColor: `${palette.text}10`, borderColor: `${palette.text}20` }]}>
@@ -182,7 +184,8 @@ export default function AttachmentsScreen() {
       </GlassView>
 
       <View style={{ height: 20 }} />
-    </View>
+      </View>
+    </>
   );
 }
 
