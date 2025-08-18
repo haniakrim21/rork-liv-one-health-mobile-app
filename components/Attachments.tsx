@@ -1,11 +1,11 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Alert, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, Image as RNImage } from "react-native";
+import { Alert, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, Image as RNImage, Modal, Pressable } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import GlassView from "@/components/GlassView";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
-import { Image as ImageIcon, Link as LinkIcon, Trash2, Plus } from "lucide-react-native";
+import { Image as ImageIcon, Link as LinkIcon, Trash2, Plus, X } from "lucide-react-native";
 
 export type Attachment =
   | { id: string; type: "image"; uri: string; name?: string }
@@ -26,6 +26,7 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
   const [link, setLink] = useState<string>("");
   const [adding, setAdding] = useState<boolean>(false);
   const [isPicking, setIsPicking] = useState<boolean>(false);
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
 
   const border = useMemo(() => ({ borderColor: `${palette.text}15` }), [palette.text]);
 
@@ -40,17 +41,17 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
     try {
       console.log("[Attachments] addImage start");
 
-      if (Platform.OS === 'ios') {
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
         const existing = await ImagePicker.getMediaLibraryPermissionsAsync();
         let granted = existing.granted;
-        console.log("[Attachments] existing perm (iOS)", existing);
+        console.log("[Attachments] existing perm (native)", existing);
         if (!granted) {
           const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          console.log("[Attachments] request perm (iOS)", perm);
+          console.log("[Attachments] request perm (native)", perm);
           granted = perm.granted;
         }
         if (!granted) {
-          Alert.alert("Permission needed", "We need access to your photos to attach images on iOS.");
+          Alert.alert("Permission needed", "We need access to your photos to attach images.");
           return;
         }
       }
@@ -182,11 +183,13 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
           {items.map((att) => (
             <View key={att.id} style={[styles.item, border]} testID={`${testID}-item-${att.id}`}>
               {att.type === "image" ? (
-                Platform.OS === 'android' ? (
-                  <RNImage source={{ uri: att.uri }} style={styles.thumb} resizeMode="cover" />
-                ) : (
-                  <Image source={{ uri: att.uri }} style={styles.thumb} contentFit="cover" />
-                )
+                <Pressable onPress={() => setPreviewUri(att.uri)} testID={`${testID}-preview-${att.id}`}>
+                  {Platform.OS === 'android' ? (
+                    <RNImage source={{ uri: att.uri }} style={styles.thumb} resizeMode="cover" />
+                  ) : (
+                    <Image source={{ uri: att.uri }} style={styles.thumb} contentFit="cover" />
+                  )}
+                </Pressable>
               ) : (
                 <View style={styles.linkCell}>
                   <LinkIcon size={16} color={palette.primary} />
@@ -212,6 +215,31 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
           ))}
         </View>
       )}
+    {/* Image preview modal */}
+    <Modal
+      visible={!!previewUri}
+      animationType={Platform.OS === 'web' ? 'none' : 'fade'}
+      transparent
+      onRequestClose={() => setPreviewUri(null)}
+    >
+      <View style={styles.modalBackdrop}>
+        <View style={[styles.modalContent, { backgroundColor: palette.card ?? palette.background }]}>
+          <View style={styles.modalHeader}>
+            <Text style={[styles.modalTitle, { color: palette.text }]}>Preview</Text>
+            <TouchableOpacity onPress={() => setPreviewUri(null)} accessibilityLabel="Close preview" testID={`${testID}-close-preview`}>
+              <X size={20} color={palette.text} />
+            </TouchableOpacity>
+          </View>
+          {previewUri ? (
+            Platform.OS === 'android' ? (
+              <RNImage source={{ uri: previewUri }} style={styles.modalImage} resizeMode="contain" />
+            ) : (
+              <Image source={{ uri: previewUri }} style={styles.modalImage} contentFit="contain" />
+            )
+          ) : null}
+        </View>
+      </View>
+    </Modal>
     </GlassView>
   );
 }
@@ -236,4 +264,9 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 12 } as const,
   openBtn: { marginRight: 6 },
   openText: { fontSize: 12, fontWeight: "600" as const },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", padding: 16 },
+  modalContent: { width: "100%", maxWidth: 520, borderRadius: 16, overflow: "hidden" },
+  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 10 },
+  modalTitle: { fontSize: 14, fontWeight: "700" as const },
+  modalImage: { width: "100%", height: 420, backgroundColor: "#000" },
 });
