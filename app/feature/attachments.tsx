@@ -4,9 +4,10 @@ import { Stack, useRouter } from "expo-router";
 import GlassView from "@/components/GlassView";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
-import { ChevronLeft, ImageIcon, Link as LinkIcon, Trash2, ExternalLink, Copy, ClipboardList as ClipboardIcon, X } from "lucide-react-native";
+import { ChevronLeft, ImageIcon, Link as LinkIcon, Trash2, ExternalLink, ClipboardList as ClipboardIcon, X, Camera } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
+import * as ImagePicker from "expo-image-picker";
 
 export type AttachmentType = "image" | "link";
 export interface AttachmentItem {
@@ -29,6 +30,8 @@ export default function AttachmentsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [pasting, setPasting] = useState<boolean>(false);
+  const [picking, setPicking] = useState<boolean>(false);
+  const [shooting, setShooting] = useState<boolean>(false);
 
   const mount = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -117,6 +120,75 @@ export default function AttachmentsScreen() {
     setItems((prev) => [next, ...prev]);
     resetForm();
   }, [isValidUrl, isImageUrl, label, resetForm, type, uri]);
+
+  const addLocalImage = useCallback((pickedUri: string, pickedLabel?: string) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const next: AttachmentItem = { id, type: "image", uri: pickedUri, label: pickedLabel };
+    setItems((prev) => [next, ...prev]);
+  }, []);
+
+  const pickFromLibrary = useCallback(async () => {
+    try {
+      setPicking(true);
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Permission needed", "Please allow photo library access to pick images.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: false,
+        quality: 0.9,
+        base64: Platform.OS === "web",
+      });
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (asset?.uri) {
+        const uriToStore = asset.base64 ? `data:${asset.type ?? "image/jpeg"};base64,${asset.base64}` : asset.uri;
+        addLocalImage(uriToStore, asset.fileName ?? "Image");
+      }
+    } catch (e) {
+      console.log("[Attachments] pick error", e);
+      Alert.alert("Error", "Failed to pick an image.");
+    } finally {
+      setPicking(false);
+    }
+  }, [addLocalImage]);
+
+  const takePhoto = useCallback(async () => {
+    try {
+      setShooting(true);
+      if (Platform.OS === "web") {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert("Permission needed", "Allow camera or file access.");
+          return;
+        }
+      } else {
+        const cam = await ImagePicker.requestCameraPermissionsAsync();
+        if (!cam.granted) {
+          Alert.alert("Permission needed", "Please allow camera access to take photos.");
+          return;
+        }
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.9,
+        base64: Platform.OS === "web",
+      });
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (asset?.uri) {
+        const uriToStore = asset.base64 ? `data:${asset.type ?? "image/jpeg"};base64,${asset.base64}` : asset.uri;
+        addLocalImage(uriToStore, asset.fileName ?? "Photo");
+      }
+    } catch (e) {
+      console.log("[Attachments] camera error", e);
+      Alert.alert("Error", "Failed to capture photo.");
+    } finally {
+      setShooting(false);
+    }
+  }, [addLocalImage]);
 
   const onRemove = useCallback((id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
@@ -237,6 +309,23 @@ export default function AttachmentsScreen() {
             </View>
             {!!error && <Text style={[styles.errorText, { color: "#ff6b6b" }]}>{error}</Text>}
           </View>
+
+          {type === "image" ? (
+            <View style={styles.quickRow}>
+              <TouchableOpacity onPress={pickFromLibrary} style={[styles.quickBtn, { borderColor: `${palette.text}20`, backgroundColor: `${palette.text}08` }]} testID="pick-image">
+                {picking ? <ActivityIndicator size="small" color={palette.primary} /> : <>
+                  <ImageIcon size={16} color={palette.text} />
+                  <Text style={[styles.quickText, { color: palette.text }]}>Pick image</Text>
+                </>}
+              </TouchableOpacity>
+              <TouchableOpacity onPress={takePhoto} style={[styles.quickBtn, { borderColor: `${palette.text}20`, backgroundColor: `${palette.text}08` }]} testID="take-photo">
+                {shooting ? <ActivityIndicator size="small" color={palette.primary} /> : <>
+                  <Camera size={16} color={palette.text} />
+                  <Text style={[styles.quickText, { color: palette.text }]}>Take photo</Text>
+                </>}
+              </TouchableOpacity>
+            </View>
+          ) : null}
 
           <View style={styles.field}> 
             <Text style={[styles.label, { color: palette.text }]}>Label (optional)</Text>
@@ -360,6 +449,9 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   pasteBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, height: 40, borderRadius: 10, borderWidth: 1 },
   pasteText: { fontSize: 12, fontWeight: "600" as const },
+  quickRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
+  quickBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, height: 40, borderRadius: 10, borderWidth: 1 },
+  quickText: { fontSize: 12, fontWeight: "600" as const },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", padding: 16 },
   modalContent: { width: "100%", maxWidth: 520, borderRadius: 16, padding: 16 },
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
