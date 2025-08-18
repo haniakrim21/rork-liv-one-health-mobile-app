@@ -41,13 +41,13 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
     try {
       console.log("[Attachments] addImage start");
 
-      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      if (Platform.OS === 'ios') {
         const existing = await ImagePicker.getMediaLibraryPermissionsAsync();
         let granted = existing.granted;
-        console.log("[Attachments] existing perm (native)", existing);
+        console.log("[Attachments] existing perm (iOS)", existing);
         if (!granted) {
           const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          console.log("[Attachments] request perm (native)", perm);
+          console.log("[Attachments] request perm (iOS)", perm);
           granted = perm.granted;
         }
         if (!granted) {
