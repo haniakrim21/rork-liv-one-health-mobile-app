@@ -5,7 +5,7 @@ import * as ImagePicker from "expo-image-picker";
 import GlassView from "@/components/GlassView";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
-import { Image as ImageIcon, Link as LinkIcon, Trash2, Plus, X } from "lucide-react-native";
+import { Image as ImageIcon, Link as LinkIcon, Trash2, Plus, X, Camera } from "lucide-react-native";
 
 export type Attachment =
   | { id: string; type: "image"; uri: string; name?: string }
@@ -16,9 +16,10 @@ interface AttachmentsProps {
   testID?: string;
   initial?: Attachment[];
   onChange?: (list: Attachment[]) => void;
+  allowCamera?: boolean;
 }
 
-export default function Attachments({ title = "Attachments", testID = "attachments", initial = [], onChange }: AttachmentsProps) {
+export default function Attachments({ title = "Attachments", testID = "attachments", initial = [], onChange, allowCamera = true }: AttachmentsProps) {
   const { theme } = useAppSettings();
   const palette = colors[theme];
 
@@ -105,6 +106,40 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
     }
   }, [isPicking, items, update]);
 
+  const takePhoto = useCallback(async () => {
+    if (!allowCamera || isPicking) return;
+    setIsPicking(true);
+    try {
+      console.log("[Attachments] takePhoto start");
+      if (Platform.OS !== 'web') {
+        const camPerm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!camPerm.granted) {
+          Alert.alert("Permission needed", "We need access to your camera to take photos.");
+          return;
+        }
+      }
+      const res = await ImagePicker.launchCameraAsync({
+        allowsEditing: false,
+        quality: 0.8,
+      });
+      console.log("[Attachments] camera result", res);
+      if (res.canceled) return;
+      const asset = res.assets?.[0];
+      if (!asset?.uri) {
+        Alert.alert("Error", "No photo captured.");
+        return;
+      }
+      const fileName: string | undefined = (asset as any)?.fileName ?? undefined;
+      const next: Attachment = { id: `${Date.now()}`, type: "image", uri: asset.uri, name: fileName ?? "Photo" };
+      update([next, ...items]);
+    } catch (e) {
+      console.error("[Attachments] takePhoto error", e);
+      Alert.alert("Error", "Could not take photo. Please try again.");
+    } finally {
+      setIsPicking(false);
+    }
+  }, [allowCamera, isPicking, items, update]);
+
   const addLink = useCallback(() => {
     try {
       const trimmed = link.trim();
@@ -149,6 +184,11 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
         <View style={styles.headerActions}>
+          {allowCamera && (
+            <TouchableOpacity onPress={takePhoto} style={[styles.iconBtn, border]} testID={`${testID}-add-camera`}>
+              <Camera size={18} color={palette.primary} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={() => setAdding(v => !v)} style={[styles.iconBtn, border]} testID={`${testID}-add-link`}>
             <LinkIcon size={18} color={palette.primary} />
           </TouchableOpacity>
