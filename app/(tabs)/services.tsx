@@ -203,6 +203,12 @@ export default function ServicesScreen() {
           color: "#E91E63",
         },
         {
+          title: "Attachments",
+          description: "Add images and links to your records",
+          icon: FileText,
+          color: "#E91E63",
+        },
+        {
           title: "Referral System",
           description: "Manual referrals and AI-initiated guidance",
           icon: Share2,
