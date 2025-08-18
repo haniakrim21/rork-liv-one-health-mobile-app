@@ -40,17 +40,17 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
     try {
       console.log("[Attachments] addImage start");
 
-      if (Platform.OS !== 'web') {
+      if (Platform.OS === 'ios') {
         const existing = await ImagePicker.getMediaLibraryPermissionsAsync();
         let granted = existing.granted;
-        console.log("[Attachments] existing perm", existing);
+        console.log("[Attachments] existing perm (iOS)", existing);
         if (!granted) {
           const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          console.log("[Attachments] request perm", perm);
+          console.log("[Attachments] request perm (iOS)", perm);
           granted = perm.granted;
         }
         if (!granted) {
-          Alert.alert("Permission needed", "We need access to your photos to attach images.");
+          Alert.alert("Permission needed", "We need access to your photos to attach images on iOS.");
           return;
         }
       }
@@ -79,7 +79,13 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
         },
       }) as ImagePicker.ImagePickerOptions;
 
-      const res = await ImagePicker.launchImageLibraryAsync(pickerOptions);
+      let res: ImagePicker.ImagePickerResult;
+      try {
+        res = await ImagePicker.launchImageLibraryAsync(pickerOptions);
+      } catch (err) {
+        console.warn("[Attachments] launchImageLibraryAsync error, retrying without options", err);
+        res = await ImagePicker.launchImageLibraryAsync();
+      }
       console.log("[Attachments] picker result", res);
       if (res.canceled) return;
       const asset = res.assets?.[0];
