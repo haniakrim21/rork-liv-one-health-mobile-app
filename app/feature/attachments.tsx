@@ -1,10 +1,11 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
-import { StyleSheet, Text, View, TouchableOpacity, TextInput, FlatList, Image, Alert, Linking, Animated } from "react-native";
+import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import { StyleSheet, Text, View, TouchableOpacity, TextInput, FlatList, Image, Alert, Linking, Animated, Platform, ActivityIndicator } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import GlassView from "@/components/GlassView";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import { ChevronLeft, ImageIcon, Link as LinkIcon, Trash2, ExternalLink } from "lucide-react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type AttachmentType = "image" | "link";
 export interface AttachmentItem {
@@ -23,12 +24,46 @@ export default function AttachmentsScreen() {
   const [uri, setUri] = useState<string>("");
   const [label, setLabel] = useState<string>("");
   const [items, setItems] = useState<AttachmentItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const mount = useRef(new Animated.Value(0)).current;
-  React.useEffect(() => {
+  useEffect(() => {
     Animated.timing(mount, { toValue: 1, duration: 400, useNativeDriver: false }).start();
   }, [mount]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const raw = await AsyncStorage.getItem("attachments");
+        const parsed: AttachmentItem[] = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(parsed)) {
+          setItems(parsed);
+        } else {
+          setItems([]);
+        }
+      } catch (e) {
+        console.log("[Attachments] load error", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  useEffect(() => {
+    const save = async () => {
+      try {
+        await AsyncStorage.setItem("attachments", JSON.stringify(items));
+      } catch (e) {
+        console.log("[Attachments] save error", e);
+      }
+    };
+    // avoid saving during initial load
+    if (!loading) {
+      save();
+    }
+  }, [items, loading]);
 
   const isValidUrl = useCallback((value: string) => {
     try {
@@ -63,6 +98,13 @@ export default function AttachmentsScreen() {
     setItems((prev) => prev.filter((i) => i.id !== id));
   }, []);
 
+  const onClearAll = useCallback(() => {
+    Alert.alert("Clear all?", "This will remove all attachments.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Clear", style: "destructive", onPress: () => setItems([]) },
+    ]);
+  }, []);
+
   const openLink = useCallback(async (url: string) => {
     try {
       const supported = await Linking.canOpenURL(url);
@@ -90,7 +132,14 @@ export default function AttachmentsScreen() {
 
       <Animated.View style={{ opacity: mount, transform: [{ translateY: mount.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}>
         <GlassView style={styles.card}>
-          <Text style={[styles.cardTitle, { color: palette.text }]}>Add attachment</Text>
+          <View style={styles.cardHeaderRow}>
+            <Text style={[styles.cardTitle, { color: palette.text }]}>Add attachment</Text>
+            {items.length > 0 && (
+              <TouchableOpacity onPress={onClearAll} testID="clear-all">
+                <Text style={[styles.clearText, { color: palette.primary }]}>Clear all</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <View style={styles.typeRow}>
             <TouchableOpacity
               onPress={() => setType("image")}
@@ -151,7 +200,12 @@ export default function AttachmentsScreen() {
 
       <GlassView style={styles.card}>
         <Text style={[styles.cardTitle, { color: palette.text }]}>Your attachments</Text>
-        {items.length === 0 ? (
+        {loading ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator color={palette.primary} />
+            <Text style={{ marginLeft: 8, color: palette.textSecondary }}>Loading…</Text>
+          </View>
+        ) : items.length === 0 ? (
           <Text style={{ color: palette.textSecondary }}>No attachments yet. Add image or link URLs above.</Text>
         ) : (
           <FlatList
@@ -196,6 +250,8 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "600" as const },
   card: { marginHorizontal: 16, borderRadius: 16, padding: 16, marginBottom: 12 },
   cardTitle: { fontSize: 16, fontWeight: "700" as const, marginBottom: 8 },
+  cardHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  clearText: { fontSize: 12, fontWeight: "600" as const },
   typeRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
   typePill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderRadius: 999 },
   typeText: { fontSize: 12, fontWeight: "600" as const },
@@ -212,4 +268,5 @@ const styles = StyleSheet.create({
   itemSub: { fontSize: 12 },
   iconBtn: { width: 34, height: 34, borderRadius: 10, justifyContent: "center", alignItems: "center", borderWidth: 1, marginLeft: 6 },
   linkRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  loadingRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8 },
 });
