@@ -585,7 +585,6 @@ export default function ServicesScreen() {
       const slug = toSlug(feature.title);
       try {
         const routeBySlug: Record<string, string> = {
-          attachments: "/feature/attachments",
           booking: "/feature/booking",
           meds: "/feature/meds",
           triage: "/feature/triage",
