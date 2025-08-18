@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, forwardRef, useImperativeHandle } from "react";
 import { Alert, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, Image as RNImage, Modal, Pressable } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
@@ -11,6 +11,12 @@ export type Attachment =
   | { id: string; type: "image"; uri: string; name?: string }
   | { id: string; type: "link"; url: string; title?: string };
 
+export type AttachmentsRef = {
+  addImage: () => Promise<void>;
+  takePhoto: () => Promise<void>;
+  startAddLink: () => void;
+};
+
 interface AttachmentsProps {
   title?: string;
   testID?: string;
@@ -19,7 +25,10 @@ interface AttachmentsProps {
   allowCamera?: boolean;
 }
 
-export default function Attachments({ title = "Attachments", testID = "attachments", initial = [], onChange, allowCamera = true }: AttachmentsProps) {
+const Attachments = forwardRef<AttachmentsRef, AttachmentsProps>(function Attachments(
+  { title = "Attachments", testID = "attachments", initial = [], onChange, allowCamera = true },
+  ref,
+) {
   const { theme } = useAppSettings();
   const palette = colors[theme];
 
@@ -36,7 +45,7 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
     if (onChange) onChange(next);
   }, [onChange]);
 
-  const addImage = useCallback(async () => {
+  const addImage = useCallback(async (): Promise<void> => {
     if (isPicking) return;
     setIsPicking(true);
     try {
@@ -106,7 +115,7 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
     }
   }, [isPicking, items, update]);
 
-  const takePhoto = useCallback(async () => {
+  const takePhoto = useCallback(async (): Promise<void> => {
     if (!allowCamera || isPicking) return;
     setIsPicking(true);
     try {
@@ -140,7 +149,7 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
     }
   }, [allowCamera, isPicking, items, update]);
 
-  const addLink = useCallback(() => {
+  const addLink = useCallback((): void => {
     try {
       const trimmed = link.trim();
       if (!trimmed) return;
@@ -159,12 +168,12 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
     }
   }, [items, link, update]);
 
-  const remove = useCallback((id: string) => {
+  const remove = useCallback((id: string): void => {
     const next = items.filter(i => i.id !== id);
     update(next);
   }, [items, update]);
 
-  const open = useCallback(async (att: Attachment) => {
+  const open = useCallback(async (att: Attachment): Promise<void> => {
     if (att.type === "link") {
       try {
         const supported = await Linking.canOpenURL(att.url);
@@ -178,6 +187,12 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
       }
     }
   }, []);
+
+  useImperativeHandle(ref, () => ({
+    addImage,
+    takePhoto,
+    startAddLink: () => setAdding(true),
+  }), [addImage, takePhoto]);
 
   return (
     <GlassView style={styles.card} testID={testID}>
@@ -282,7 +297,9 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
     </Modal>
     </GlassView>
   );
-}
+});
+
+export default Attachments;
 
 const styles = StyleSheet.create({
   card: { padding: 16, borderRadius: 16, marginHorizontal: 16, marginBottom: 16 },
