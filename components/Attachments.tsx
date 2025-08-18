@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState, forwardRef, useImperativeHandle 
 import { Alert, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, Image as RNImage, Modal, Pressable } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import * as Clipboard from "expo-clipboard";
 import GlassView from "@/components/GlassView";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
@@ -168,9 +169,22 @@ const Attachments = forwardRef<AttachmentsRef, AttachmentsProps>(function Attach
     }
   }, [items, link, update]);
 
-  const remove = useCallback((id: string): void => {
-    const next = items.filter(i => i.id !== id);
-    update(next);
+  const confirmRemove = useCallback((id: string): void => {
+    Alert.alert(
+      "Remove attachment",
+      "Are you sure you want to remove this attachment?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => {
+            const next = items.filter(i => i.id !== id);
+            update(next);
+          },
+        },
+      ],
+    );
   }, [items, update]);
 
   const open = useCallback(async (att: Attachment): Promise<void> => {
@@ -225,6 +239,20 @@ const Attachments = forwardRef<AttachmentsRef, AttachmentsProps>(function Attach
             keyboardType={Platform.OS === 'web' ? 'default' : 'url'}
             testID={`${testID}-url-input`}
           />
+          <TouchableOpacity
+            onPress={async () => {
+              try {
+                const text = await Clipboard.getStringAsync();
+                if (text) setLink(text);
+              } catch (e) {
+                Alert.alert("Clipboard error", "Unable to access clipboard on this platform.");
+              }
+            }}
+            style={[styles.addBtn, { backgroundColor: `${palette.primary}22` }]}
+            testID={`${testID}-paste-url`}
+          >
+            <LinkIcon size={16} color={palette.primary} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={addLink} style={[styles.addBtn, { backgroundColor: palette.primary }]} testID={`${testID}-save-url`}>
             <Plus size={16} color={palette.background} />
           </TouchableOpacity>
@@ -238,7 +266,7 @@ const Attachments = forwardRef<AttachmentsRef, AttachmentsProps>(function Attach
           {items.map((att) => (
             <View key={att.id} style={[styles.item, border]} testID={`${testID}-item-${att.id}`}>
               {att.type === "image" ? (
-                <Pressable onPress={() => setPreviewUri(att.uri)} testID={`${testID}-preview-${att.id}`}>
+                <Pressable onPress={() => setPreviewUri(att.uri)} onLongPress={() => confirmRemove(att.id)} testID={`${testID}-preview-${att.id}`}>
                   {Platform.OS === 'android' ? (
                     <RNImage source={{ uri: att.uri }} style={styles.thumb} resizeMode="cover" />
                   ) : (
@@ -246,10 +274,10 @@ const Attachments = forwardRef<AttachmentsRef, AttachmentsProps>(function Attach
                   )}
                 </Pressable>
               ) : (
-                <View style={styles.linkCell}>
+                <Pressable style={styles.linkCell} onPress={() => open(att)} testID={`${testID}-link-${att.id}`}>
                   <LinkIcon size={16} color={palette.primary} />
                   <Text numberOfLines={2} style={[styles.linkText, { color: palette.text }]}>{att.url}</Text>
-                </View>
+                </Pressable>
               )}
               <View style={styles.itemFooter}>
                 <Text style={[styles.itemLabel, { color: palette.textSecondary }]} numberOfLines={1}>
@@ -261,7 +289,7 @@ const Attachments = forwardRef<AttachmentsRef, AttachmentsProps>(function Attach
                       <Text style={[styles.openText, { color: palette.primary }]}>Open</Text>
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity onPress={() => remove(att.id)} accessibilityLabel="Remove attachment" testID={`${testID}-remove-${att.id}`}>
+                  <TouchableOpacity onPress={() => confirmRemove(att.id)} accessibilityLabel="Remove attachment" testID={`${testID}-remove-${att.id}`}>
                     <Trash2 size={16} color={palette.textSecondary} />
                   </TouchableOpacity>
                 </View>
@@ -276,7 +304,7 @@ const Attachments = forwardRef<AttachmentsRef, AttachmentsProps>(function Attach
       animationType={Platform.OS === 'web' ? 'none' : 'fade'}
       transparent
       onRequestClose={() => setPreviewUri(null)}
-    >
+>
       <View style={styles.modalBackdrop}>
         <View style={[styles.modalContent, { backgroundColor: palette.card ?? palette.background }]}>
           <View style={styles.modalHeader}>
