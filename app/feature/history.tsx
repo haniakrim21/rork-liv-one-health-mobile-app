@@ -3,10 +3,10 @@ import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView, Alert 
 import { useRouter } from "expo-router";
 import { ChevronLeft, ClipboardList, Check } from "lucide-react-native";
 import GlassView from "@/components/GlassView";
-import Attachments, { Attachment } from "@/components/Attachments";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import { trpc } from "@/lib/trpc";
+import { Paperclip } from "lucide-react-native";
 
 interface HistoryForm {
   smoking: string;
@@ -14,7 +14,7 @@ interface HistoryForm {
   conditions: string;
   meds: string;
   allergies: string;
-  attachments: Attachment[];
+  attachments: { id: string; type: 'image' | 'link'; uri: string }[];
 }
 
 export default function HistoryScreen() {
@@ -148,14 +148,19 @@ export default function HistoryScreen() {
             />
           </View>
 
-          <Attachments
-  title="Attachments"
-  initial={form.attachments}
-  onChange={(list) => setForm((p) => ({ ...p, attachments: list }))}
-  testID="history-attachments"
-/>
+          <GlassView style={styles.attachCard} testID="history-attachments">
+            <View style={styles.attachRow}>
+              <View style={[styles.attachIcon, { backgroundColor: `${palette.text}10` }]}>
+                <Paperclip size={18} color={palette.text} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.attachTitle, { color: palette.text }]}>Attachments</Text>
+                <Text style={[styles.attachSub, { color: palette.textSecondary }]}>Add documents and images coming soon</Text>
+              </View>
+            </View>
+          </GlassView>
 
-<TouchableOpacity onPress={onSubmit} disabled={!canSubmit || saveMutation.isPending} style={[styles.primaryBtn, { backgroundColor: canSubmit && !saveMutation.isPending ? palette.primary : `${palette.text}20` }]} testID="history-submit">
+          <TouchableOpacity onPress={onSubmit} disabled={!canSubmit || saveMutation.isPending} style={[styles.primaryBtn, { backgroundColor: canSubmit && !saveMutation.isPending ? palette.primary : `${palette.text}20` }]} testID="history-submit">
             <Check size={16} color={palette.background} />
             <Text style={[styles.primaryBtnText, { color: palette.background }]}>{saveMutation.isPending ? "Saving..." : "Save"}</Text>
           </TouchableOpacity>
@@ -172,6 +177,11 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "600" as const },
   card: { marginHorizontal: 16, borderRadius: 16, padding: 16 },
   cardHeader: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  attachCard: { marginTop: 8, borderRadius: 12, padding: 12 },
+  attachRow: { flexDirection: "row", alignItems: "center" },
+  attachIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center", marginRight: 10 },
+  attachTitle: { fontSize: 14, fontWeight: "700" as const },
+  attachSub: { fontSize: 12 },
   iconWrap: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center", marginRight: 10 },
   cardTitle: { fontSize: 16, fontWeight: "700" as const },
   field: { marginBottom: 10 },

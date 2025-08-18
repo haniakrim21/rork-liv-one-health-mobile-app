@@ -1,11 +1,10 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, View, TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
-import { ChevronLeft, Brain, SendHorizonal, Stethoscope, Calendar } from "lucide-react-native";
+import { ChevronLeft, Brain, SendHorizonal, Stethoscope, Calendar, Paperclip } from "lucide-react-native";
 import GlassView from "@/components/GlassView";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
-import Attachments, { type Attachment } from "@/components/Attachments";
 
 type ContentPart = { type: "text"; text: string } | { type: "image"; image: string };
 type CoreMessage = { role: "system" | "user" | "assistant"; content: string | ContentPart[] };
@@ -25,7 +24,6 @@ export default function TriageScreen() {
   }]);
   const [loading, setLoading] = useState<boolean>(false);
   const listRef = useRef<FlatList<ChatItem>>(null);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const quickPrompts = useMemo(
     () => [
@@ -126,7 +124,17 @@ export default function TriageScreen() {
         ))}
       </View>
 
-      <Attachments title="Attachments" initial={attachments} onChange={setAttachments} testID="triage-attachments" />
+      <GlassView style={styles.attachCard} testID="triage-attachments-placeholder">
+        <View style={styles.attachRow}>
+          <View style={styles.attachIconWrap}>
+            <Paperclip size={18} color={palette.text} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.attachTitle, { color: palette.text }]}>Attachments</Text>
+            <Text style={[styles.attachSub, { color: palette.textSecondary }]}>Add photos and files coming soon</Text>
+          </View>
+        </View>
+      </GlassView>
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={80}>
         <View style={[styles.inputRow, { borderColor: `${palette.text}20`, backgroundColor: `${palette.text}06` }]}> 
@@ -180,6 +188,11 @@ const styles = StyleSheet.create({
   msg: { maxWidth: "82%", padding: 12, borderRadius: 12 },
   quickRow: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
   quickPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1 },
+  attachCard: { marginHorizontal: 16, borderRadius: 16, padding: 12, marginBottom: 8 },
+  attachRow: { flexDirection: "row", alignItems: "center" },
+  attachIconWrap: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center", marginRight: 10 },
+  attachTitle: { fontSize: 14, fontWeight: "700" as const },
+  attachSub: { fontSize: 12 },
   inputRow: { flexDirection: "row", alignItems: "center", marginHorizontal: 16, borderRadius: 14, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8, gap: 10 },
   input: { flex: 1, minHeight: 40, maxHeight: 120 },
   ctaRow: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
