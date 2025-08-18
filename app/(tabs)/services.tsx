@@ -55,7 +55,6 @@ import {
   FlaskConical,
   Scan,
 } from "lucide-react-native";
-import type { LucideIcon } from "lucide-react-native";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
 import GlassView from "@/components/GlassView";
@@ -67,10 +66,12 @@ const HORIZONTAL_PADDING = 40;
 const INTER_ITEM_GAP = 14;
 const cardWidth = (width - HORIZONTAL_PADDING - INTER_ITEM_GAP) / 2;
 
+type IconType = React.ComponentType<{ color?: string; size?: number }>;
+
 type ServiceFeature = {
   title: string;
   description: string;
-  icon: LucideIcon;
+  icon: IconType;
   color: string;
   comingSoon?: boolean;
 };
@@ -79,7 +80,7 @@ type ServiceCategory = {
   title: string;
   description: string;
   gradient: readonly [string, string];
-  icon: LucideIcon;
+  icon: IconType;
   features: ServiceFeature[];
 };
 
