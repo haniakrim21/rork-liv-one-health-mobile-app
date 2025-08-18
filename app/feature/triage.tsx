@@ -5,6 +5,7 @@ import { ChevronLeft, Brain, SendHorizonal, Stethoscope, Calendar } from "lucide
 import GlassView from "@/components/GlassView";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
+import Attachments, { type Attachment } from "@/components/Attachments";
 
 type ContentPart = { type: "text"; text: string } | { type: "image"; image: string };
 type CoreMessage = { role: "system" | "user" | "assistant"; content: string | ContentPart[] };
@@ -24,6 +25,7 @@ export default function TriageScreen() {
   }]);
   const [loading, setLoading] = useState<boolean>(false);
   const listRef = useRef<FlatList<ChatItem>>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const quickPrompts = useMemo(
     () => [
@@ -123,6 +125,8 @@ export default function TriageScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      <Attachments title="Attachments" initial={attachments} onChange={setAttachments} testID="triage-attachments" />
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={80}>
         <View style={[styles.inputRow, { borderColor: `${palette.text}20`, backgroundColor: `${palette.text}06` }]}> 
