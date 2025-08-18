@@ -74,6 +74,7 @@ type ServiceFeature = {
   icon: IconType;
   color: string;
   comingSoon?: boolean;
+  route?: `/${string}`;
 };
 
 type ServiceCategory = {
@@ -190,6 +191,7 @@ export default function ServicesScreen() {
           description: "Book in-clinic, virtual, or cube-based appointments",
           icon: Calendar,
           color: "#E91E63",
+          route: "/feature/booking",
         },
         {
           title: "Lifestyle & Health History",
@@ -208,6 +210,7 @@ export default function ServicesScreen() {
           description: "Add images and links to your records",
           icon: FileText,
           color: "#E91E63",
+          route: "/feature/attachments",
         },
         {
           title: "Referral System",
@@ -220,6 +223,7 @@ export default function ServicesScreen() {
           description: "AI-powered symptom checker and health assessment",
           icon: Brain,
           color: "#E91E63",
+          route: "/feature/triage",
         },
         {
           title: "Virtual Consultations",
@@ -232,6 +236,7 @@ export default function ServicesScreen() {
           description: "Track medications with refill reminders",
           icon: Pill,
           color: "#E91E63",
+          route: "/feature/meds",
         },
         {
           title: "Check-Up Cubes",
@@ -512,7 +517,7 @@ export default function ServicesScreen() {
         { title: "Live Chat & Social", description: "Connect and get help fast.", icon: MessageCircle, color: "#26A69A" },
         { title: "CX Metrics", description: "CSAT, churn, activation.", icon: BarChart3, color: "#26A69A" },
         { title: "Lab + AI Interpretation", description: "Understand your results.", icon: FlaskConical, color: "#26A69A" },
-        { title: "Unified Visit History", description: "Follow-ups in one place.", icon: FileText, color: "#26A69A" },
+        { title: "Unified Visit History", description: "Follow-ups in one place.", icon: FileText, color: "#26A69A", route: "/feature/history" },
         { title: "Loyalty & Gamification", description: "Earn, redeem, advance.", icon: Award, color: "#26A69A" },
         { title: "Appointments/Day", description: "Track operational capacity.", icon: Calendar, color: "#26A69A" },
         { title: "Ratings & Reviews", description: "Strive for 4.5+.", icon: Award, color: "#26A69A" },
@@ -583,21 +588,13 @@ export default function ServicesScreen() {
         console.log(`${feature.title} - Coming Soon!`);
         return;
       }
-      const slug = toSlug(feature.title);
       try {
-        const routeBySlug: Record<string, string> = {
-          booking: "/feature/booking",
-          meds: "/feature/meds",
-          triage: "/feature/triage",
-          history: "/feature/history",
-          attachments: "/feature/attachments",
-        };
-        const path = routeBySlug[slug];
-        if (path) {
-          router.push(path as any);
-        } else {
-          console.log(`[Services] No route implemented for slug: ${slug}`);
+        if (feature.route) {
+          router.push(feature.route as any);
+          return;
         }
+        const slug = toSlug(feature.title);
+        console.log(`[Services] No route implemented for slug: ${slug}`);
       } catch (e) {
         console.log("[Services] Navigation error", e);
       }
