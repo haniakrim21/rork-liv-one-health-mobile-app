@@ -584,6 +584,10 @@ export default function ServicesScreen() {
       }
       const slug = toSlug(feature.title);
       try {
+        if (slug === "attachments") {
+          router.push("/feature/attachments");
+          return;
+        }
         router.push({ pathname: "/feature/[slug]", params: { slug } });
       } catch (e) {
         console.log("[Services] Navigation error", e);
