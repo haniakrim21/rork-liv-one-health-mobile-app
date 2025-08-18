@@ -1,329 +1,212 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Alert,
-  Animated,
-  FlatList,
-  Linking,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  Image,
-} from "react-native";
-import { Stack } from "expo-router";
-import * as ImagePicker from "expo-image-picker";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import { StyleSheet, Text, View, TouchableOpacity, TextInput, FlatList, Image, Alert, Linking, Animated } from "react-native";
+import { useRouter } from "expo-router";
+import GlassView from "@/components/GlassView";
 import { useAppSettings } from "@/providers/AppSettingsProvider";
 import { colors } from "@/constants/colors";
-import GlassView from "@/components/GlassView";
-import NextSteps from "@/components/NextSteps";
-import { Camera, Image as ImageIcon, Link as LinkIcon, Trash2, ExternalLink, Plus } from "lucide-react-native";
+import { ChevronLeft, ImageIcon, Link as LinkIcon, Trash2, ExternalLink } from "lucide-react-native";
 
-interface AttachmentItem {
+export type AttachmentType = "image" | "link";
+export interface AttachmentItem {
   id: string;
-  type: "image" | "link";
+  type: AttachmentType;
   uri: string;
-  title?: string;
-  createdAt: number;
+  label?: string;
 }
-
-const STORAGE_KEY = "attachments_v1";
 
 export default function AttachmentsScreen() {
   const { theme } = useAppSettings();
   const palette = colors[theme];
+  const router = useRouter();
 
-
-  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
-  const [isPicking, setIsPicking] = useState<boolean>(false);
-  const [linkUrl, setLinkUrl] = useState<string>("");
-  const [linkTitle, setLinkTitle] = useState<string>("");
+  const [type, setType] = useState<AttachmentType>("image");
+  const [uri, setUri] = useState<string>("");
+  const [label, setLabel] = useState<string>("");
+  const [items, setItems] = useState<AttachmentItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const mount = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
+  React.useEffect(() => {
     Animated.timing(mount, { toValue: 1, duration: 400, useNativeDriver: false }).start();
   }, [mount]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw) as AttachmentItem[];
-          if (Array.isArray(parsed)) {
-            setAttachments(parsed);
-          }
-        }
-      } catch (e) {
-        console.log("[Attachments] load error", e);
-      }
-    })();
-  }, []);
-
-  const save = useCallback(async (data: AttachmentItem[]) => {
+  const isValidUrl = useCallback((value: string) => {
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-      console.log("[Attachments] save error", e);
-    }
-  }, []);
-
-  const addItems = useCallback((items: AttachmentItem[]) => {
-    setAttachments((prev) => {
-      const next = [...items, ...prev].sort((a, b) => b.createdAt - a.createdAt);
-      save(next);
-      return next;
-    });
-  }, [save]);
-
-  const pickFromLibrary = useCallback(async () => {
-    setError(null);
-    setIsPicking(true);
-    try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted && Platform.OS !== "web") {
-        setError("Permission to access photos is required.");
-        setIsPicking(false);
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        allowsMultipleSelection: true,
-        quality: 0.8,
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      });
-      if (result.canceled) {
-        setIsPicking(false);
-        return;
-      }
-      const assets = result.assets ?? [];
-      const items: AttachmentItem[] = assets.map((a) => ({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        type: "image",
-        uri: a.uri,
-        title: a.fileName ?? "Image",
-        createdAt: Date.now(),
-      }));
-      addItems(items);
-      setIsPicking(false);
-    } catch (e) {
-      console.log("[Attachments] pick error", e);
-      setError("Failed to pick images.");
-      setIsPicking(false);
-    }
-  }, [addItems]);
-
-  const takePhoto = useCallback(async () => {
-    setError(null);
-    if (Platform.OS === "web") {
-      pickFromLibrary();
-      return;
-    }
-    setIsPicking(true);
-    try {
-      const perm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!perm.granted) {
-        setError("Camera permission is required.");
-        setIsPicking(false);
-        return;
-      }
-      const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-      if (result.canceled) {
-        setIsPicking(false);
-        return;
-      }
-      const asset = result.assets?.[0];
-      if (asset?.uri) {
-        addItems([{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, type: "image", uri: asset.uri, title: "Photo", createdAt: Date.now() }]);
-      }
-      setIsPicking(false);
-    } catch (e) {
-      console.log("[Attachments] camera error", e);
-      setError("Failed to take photo.");
-      setIsPicking(false);
-    }
-  }, [addItems, pickFromLibrary]);
-
-  const validateUrl = useCallback((u: string): boolean => {
-    try {
-      const url = new URL(u.startsWith("http") ? u : `https://${u}`);
-      return !!url.protocol && !!url.host;
-    } catch {
+      const u = new URL(value);
+      return u.protocol === "http:" || u.protocol === "https:";
+    } catch (_e) {
       return false;
     }
   }, []);
 
-  const onAddLink = useCallback(() => {
+  const canAdd = useMemo(() => isValidUrl(uri.trim()), [isValidUrl, uri]);
+
+  const resetForm = useCallback(() => {
+    setUri("");
+    setLabel("");
     setError(null);
-    const trimmed = linkUrl.trim();
-    if (!validateUrl(trimmed)) {
-      setError("Enter a valid URL");
+  }, []);
+
+  const onAdd = useCallback(() => {
+    const clean = uri.trim();
+    if (!isValidUrl(clean)) {
+      setError("Enter a valid URL starting with http(s)://");
       return;
     }
-    const normalized = trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;
-    const item: AttachmentItem = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      type: "link",
-      uri: normalized,
-      title: linkTitle.trim() || normalized,
-      createdAt: Date.now(),
-    };
-    addItems([item]);
-    setLinkUrl("");
-    setLinkTitle("");
-  }, [addItems, linkTitle, linkUrl, validateUrl]);
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const next: AttachmentItem = { id, type, uri: clean, label: label.trim().length ? label.trim() : undefined };
+    setItems((prev) => [next, ...prev]);
+    resetForm();
+  }, [isValidUrl, label, resetForm, type, uri]);
 
-  const removeItem = useCallback((id: string) => {
-    Alert.alert("Remove attachment", "This action cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Remove",
-        style: "destructive",
-        onPress: () => {
-          setAttachments((prev) => {
-            const next = prev.filter((i) => i.id !== id);
-            save(next);
-            return next;
-          });
-        },
-      },
-    ]);
-  }, [save]);
+  const onRemove = useCallback((id: string) => {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+  }, []);
 
-  const openItem = useCallback(async (item: AttachmentItem) => {
+  const openLink = useCallback(async (url: string) => {
     try {
-      await Linking.openURL(item.uri);
+      const supported = await Linking.canOpenURL(url);
+      if (supported) await Linking.openURL(url);
+      else Alert.alert("Can't open", "This URL is not supported on your device.");
     } catch (e) {
       console.log("[Attachments] open error", e);
-      setError("Unable to open.");
+      Alert.alert("Error", "Failed to open the link.");
     }
   }, []);
 
-  const renderItem = useCallback(({ item }: { item: AttachmentItem }) => {
-    return (
-      <GlassView style={styles.item}>
-        <View style={styles.itemRow}>
-          <View style={[styles.thumbWrap, { backgroundColor: `${palette.text}08`, borderColor: `${palette.text}12` }]}> 
-            {item.type === "image" ? (
-              <Image source={{ uri: item.uri }} style={styles.thumb} resizeMode="cover" />
-            ) : (
-              <LinkIcon size={20} color={palette.primary} />
-            )}
-          </View>
-          <View style={styles.itemInfo}>
-            <Text style={[styles.itemTitle, { color: palette.text }]} numberOfLines={2}>
-              {item.title ?? (item.type === "image" ? "Image" : item.uri)}
-            </Text>
-            <Text style={[styles.itemSub, { color: palette.textSecondary }]} numberOfLines={1}>
-              {item.type === "image" ? "Image" : item.uri}
-            </Text>
-          </View>
-          <View style={styles.itemActions}>
-            <TouchableOpacity onPress={() => openItem(item)} style={styles.iconBtn} testID={`open-${item.id}`}>
-              <ExternalLink size={18} color={palette.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => removeItem(item.id)} style={styles.iconBtn} testID={`remove-${item.id}`}>
-              <Trash2 size={18} color={palette.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </GlassView>
-    );
-  }, [openItem, palette.primary, palette.text, palette.textSecondary, removeItem]);
-
-  const keyExtractor = useCallback((i: AttachmentItem) => i.id, []);
-
-  const header = useMemo(() => (
-    <Animated.View style={{ opacity: mount, transform: [{ translateY: mount.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}>
-      <GlassView style={styles.actions}>
-        <TouchableOpacity disabled={isPicking} onPress={pickFromLibrary} style={[styles.actionBtn, { opacity: isPicking ? 0.6 : 1, backgroundColor: `${palette.primary}18`, borderColor: `${palette.primary}30` }]} testID="attachments-add-image">
-          <ImageIcon size={18} color={palette.primary} />
-          <Text style={[styles.actionText, { color: palette.primary }]}>Photos</Text>
-        </TouchableOpacity>
-        <TouchableOpacity disabled={isPicking} onPress={takePhoto} style={[styles.actionBtn, { opacity: isPicking ? 0.6 : 1, backgroundColor: `${palette.text}10`, borderColor: `${palette.text}20` }]} testID="attachments-add-camera">
-          <Camera size={18} color={palette.text} />
-          <Text style={[styles.actionText, { color: palette.text }]}>Camera</Text>
-        </TouchableOpacity>
-      </GlassView>
-
-      <GlassView style={styles.linkBox}>
-        <Text style={[styles.sectionTitle, { color: palette.text }]}>Add a link</Text>
-        <View style={styles.linkRow}>
-          <TextInput
-            placeholder="https://example.com or example.com"
-            placeholderTextColor={palette.textSecondary}
-            value={linkUrl}
-            onChangeText={setLinkUrl}
-            style={[styles.input, { color: palette.text, borderColor: `${palette.text}20`, backgroundColor: `${palette.text}06` }]}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType={Platform.OS === "web" ? "default" : "url"}
-            testID="link-input"
-          />
-        </View>
-        <View style={styles.linkRow}>
-          <TextInput
-            placeholder="Optional title"
-            placeholderTextColor={palette.textSecondary}
-            value={linkTitle}
-            onChangeText={setLinkTitle}
-            style={[styles.input, { color: palette.text, borderColor: `${palette.text}20`, backgroundColor: `${palette.text}06` }]}
-            autoCapitalize="sentences"
-            autoCorrect
-            testID="link-title-input"
-          />
-        </View>
-        {!!error && (
-          <Text style={[styles.errorText, { color: "#E53935" }]} testID="attachments-error">{error}</Text>
-        )}
-        <TouchableOpacity onPress={onAddLink} style={[styles.addLinkBtn, { backgroundColor: palette.primary }]} testID="add-link-button">
-          <Plus size={18} color={palette.background} />
-          <Text style={[styles.addLinkText, { color: palette.background }]}>Add link</Text>
-        </TouchableOpacity>
-      </GlassView>
-    </Animated.View>
-  ), [palette.background, palette.text, palette.textSecondary, palette.primary, error, linkTitle, linkUrl, mount, onAddLink, pickFromLibrary, takePhoto, isPicking]);
-
   return (
     <View style={[styles.container, { backgroundColor: palette.background }]} testID="attachments-screen">
-      <Stack.Screen options={{ title: "Attachments" }} />
-      <FlatList
-        data={attachments}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        ListHeaderComponent={header}
-        ListFooterComponent={<NextSteps testID="attachments-next-steps" />}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      <View style={styles.headerRow}>
+        <TouchableOpacity onPress={() => router.back()} testID="attachments-back">
+          <View style={[styles.backBtn, { backgroundColor: `${palette.text}10`, borderColor: `${palette.text}20` }]}>
+            <ChevronLeft size={20} color={palette.text} />
+          </View>
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: palette.text }]}>Attachments</Text>
+        <View style={{ width: 36 }} />
+      </View>
+
+      <Animated.View style={{ opacity: mount, transform: [{ translateY: mount.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}>
+        <GlassView style={styles.card}>
+          <Text style={[styles.cardTitle, { color: palette.text }]}>Add attachment</Text>
+          <View style={styles.typeRow}>
+            <TouchableOpacity
+              onPress={() => setType("image")}
+              style={[styles.typePill, { borderColor: type === "image" ? palette.primary : `${palette.text}25`, backgroundColor: type === "image" ? `${palette.primary}20` : "transparent" }]}
+              testID="type-image"
+            >
+              <ImageIcon size={16} color={type === "image" ? palette.primary : palette.text} />
+              <Text style={[styles.typeText, { color: palette.text }]}>Image URL</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setType("link")}
+              style={[styles.typePill, { borderColor: type === "link" ? palette.primary : `${palette.text}25`, backgroundColor: type === "link" ? `${palette.primary}20` : "transparent" }]}
+              testID="type-link"
+            >
+              <LinkIcon size={16} color={type === "link" ? palette.primary : palette.text} />
+              <Text style={[styles.typeText, { color: palette.text }]}>Link</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.field}> 
+            <Text style={[styles.label, { color: palette.text }]}>{type === "image" ? "Image URL" : "Link URL"}</Text>
+            <TextInput
+              placeholder={type === "image" ? "https://example.com/photo.jpg" : "https://example.com/page"}
+              placeholderTextColor={`${palette.text}70`}
+              value={uri}
+              onChangeText={(t) => { setUri(t); if (error) setError(null); }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              style={[styles.input, { color: palette.text, borderColor: error ? "#ff6b6b" : `${palette.text}20` }]}
+              testID="attachment-url"
+            />
+            {!!error && <Text style={[styles.errorText, { color: "#ff6b6b" }]}>{error}</Text>}
+          </View>
+
+          <View style={styles.field}> 
+            <Text style={[styles.label, { color: palette.text }]}>Label (optional)</Text>
+            <TextInput
+              placeholder="e.g., Lab result, X-ray, website"
+              placeholderTextColor={`${palette.text}70`}
+              value={label}
+              onChangeText={setLabel}
+              style={[styles.input, { color: palette.text, borderColor: `${palette.text}20` }]}
+              testID="attachment-label"
+            />
+          </View>
+
+          <TouchableOpacity
+            onPress={onAdd}
+            disabled={!canAdd}
+            style={[styles.primaryBtn, { backgroundColor: canAdd ? palette.primary : `${palette.text}20` }]}
+            testID="add-attachment"
+          >
+            <Text style={[styles.primaryBtnText, { color: palette.background }]}>Add</Text>
+          </TouchableOpacity>
+        </GlassView>
+      </Animated.View>
+
+      <GlassView style={styles.card}>
+        <Text style={[styles.cardTitle, { color: palette.text }]}>Your attachments</Text>
+        {items.length === 0 ? (
+          <Text style={{ color: palette.textSecondary }}>No attachments yet. Add image or link URLs above.</Text>
+        ) : (
+          <FlatList
+            data={items}
+            keyExtractor={(i) => i.id}
+            contentContainerStyle={{ paddingVertical: 4 }}
+            renderItem={({ item }) => (
+              <View style={styles.row}>
+                <View style={[styles.preview, { backgroundColor: `${palette.text}08`, borderColor: `${palette.text}12` }]}> 
+                  {item.type === "image" ? (
+                    <Image source={{ uri: item.uri }} style={styles.thumb} resizeMode="cover" />
+                  ) : (
+                    <LinkIcon size={18} color={palette.text} />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.itemTitle, { color: palette.text }]} numberOfLines={1}>{item.label ?? (item.type === "image" ? "Image" : "Link")}</Text>
+                  <TouchableOpacity onPress={() => openLink(item.uri)} style={styles.linkRow} testID={`open-${item.id}`}>
+                    <ExternalLink size={14} color={palette.primary} />
+                    <Text style={[styles.itemSub, { color: palette.primary }]} numberOfLines={1}>{item.uri}</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity onPress={() => onRemove(item.id)} style={[styles.iconBtn, { borderColor: `${palette.text}20` }]} testID={`remove-${item.id}`}>
+                  <Trash2 size={16} color={palette.text} />
+                </TouchableOpacity>
+              </View>
+            )}
+          />
+        )}
+      </GlassView>
+
+      <View style={{ height: 20 }} />
     </View>
   );
 }
 
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  listContent: { padding: 16, paddingBottom: 24 },
-  actions: { flexDirection: "row", gap: 10 as unknown as number, padding: 12, borderRadius: 16 },
-  actionBtn: { flexDirection: "row", alignItems: "center", paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1 },
-  actionText: { marginLeft: 8, fontWeight: "700" as const },
-  linkBox: { marginTop: 12, padding: 12, borderRadius: 16 },
-  sectionTitle: { fontSize: 16, fontWeight: "700" as const, marginBottom: 8 },
-  linkRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  input: { flex: 1, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1, fontSize: 14 },
-  addLinkBtn: { marginTop: 6, alignSelf: "flex-start", flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
-  addLinkText: { marginLeft: 8, fontWeight: "700" as const },
-  errorText: { marginTop: 4, fontSize: 12 },
-
-  item: { marginTop: 12, borderRadius: 16, padding: 12 },
-  itemRow: { flexDirection: "row", alignItems: "center" },
-  thumbWrap: { width: 48, height: 48, borderRadius: 12, borderWidth: 1, justifyContent: "center", alignItems: "center", overflow: "hidden" },
-  thumb: { width: 48, height: 48 },
-  itemInfo: { flex: 1, marginLeft: 12 },
-  itemTitle: { fontSize: 14, fontWeight: "700" as const },
-  itemSub: { fontSize: 12, marginTop: 2 },
-  itemActions: { flexDirection: "row" },
-  iconBtn: { paddingHorizontal: 8, paddingVertical: 6 },
+  headerRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+  backBtn: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, justifyContent: "center", alignItems: "center" },
+  headerTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "600" as const },
+  card: { marginHorizontal: 16, borderRadius: 16, padding: 16, marginBottom: 12 },
+  cardTitle: { fontSize: 16, fontWeight: "700" as const, marginBottom: 8 },
+  typeRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
+  typePill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderRadius: 999 },
+  typeText: { fontSize: 12, fontWeight: "600" as const },
+  field: { marginBottom: 10 },
+  label: { fontSize: 12, marginBottom: 6 },
+  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
+  errorText: { fontSize: 11, marginTop: 4 },
+  primaryBtn: { marginTop: 4, paddingVertical: 12, borderRadius: 12, alignItems: "center" },
+  primaryBtnText: { fontSize: 14, fontWeight: "700" as const },
+  row: { flexDirection: "row", alignItems: "center", paddingVertical: 8, gap: 10 },
+  preview: { width: 44, height: 44, borderRadius: 10, justifyContent: "center", alignItems: "center", borderWidth: 1, overflow: "hidden" },
+  thumb: { width: 44, height: 44 },
+  itemTitle: { fontSize: 14, fontWeight: "600" as const },
+  itemSub: { fontSize: 12 },
+  iconBtn: { width: 34, height: 34, borderRadius: 10, justifyContent: "center", alignItems: "center", borderWidth: 1, marginLeft: 6 },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: 6 },
 });

@@ -590,6 +590,7 @@ export default function ServicesScreen() {
           meds: "/feature/meds",
           triage: "/feature/triage",
           history: "/feature/history",
+          attachments: "/feature/attachments",
         };
         const path = routeBySlug[slug];
         if (path) {
