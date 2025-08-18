@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Alert, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, Image as RNImage } from "react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import GlassView from "@/components/GlassView";
@@ -35,8 +35,16 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
 
   const addImage = useCallback(async () => {
     try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
+      console.log("[Attachments] addImage start");
+      const existing = await ImagePicker.getMediaLibraryPermissionsAsync();
+      let granted = existing.granted;
+      console.log("[Attachments] existing perm", existing);
+      if (!granted) {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        console.log("[Attachments] request perm", perm);
+        granted = perm.granted;
+      }
+      if (!granted) {
         Alert.alert("Permission needed", "We need access to your photos to attach images.");
         return;
       }
@@ -44,11 +52,17 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
         quality: 0.8,
+        selectionLimit: 1,
       });
+      console.log("[Attachments] picker result", res);
       if (res.canceled) return;
       const asset = res.assets?.[0];
-      if (!asset?.uri) return;
-      const next: Attachment = { id: `${Date.now()}`, type: "image", uri: asset.uri, name: (asset as any)?.fileName ?? undefined };
+      if (!asset?.uri) {
+        Alert.alert("Error", "No image selected.");
+        return;
+      }
+      const fileName: string | undefined = (asset as any)?.fileName ?? undefined;
+      const next: Attachment = { id: `${Date.now()}`, type: "image", uri: asset.uri, name: fileName };
       update([next, ...items]);
     } catch (e) {
       console.error("[Attachments] addImage error", e);
@@ -129,7 +143,11 @@ export default function Attachments({ title = "Attachments", testID = "attachmen
           {items.map((att) => (
             <View key={att.id} style={[styles.item, border]} testID={`${testID}-item-${att.id}`}>
               {att.type === "image" ? (
-                <Image source={{ uri: att.uri }} style={styles.thumb} contentFit="cover" />
+                Platform.OS === 'android' ? (
+                  <RNImage source={{ uri: att.uri }} style={styles.thumb} resizeMode="cover" />
+                ) : (
+                  <Image source={{ uri: att.uri }} style={styles.thumb} contentFit="cover" />
+                )
               ) : (
                 <View style={styles.linkCell}>
                   <LinkIcon size={16} color={palette.primary} />
