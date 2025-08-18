@@ -204,6 +204,7 @@ export default function ServicesScreen() {
           description: "Unified EHR and comprehensive health records",
           icon: FileText,
           color: "#E91E63",
+          route: "/feature/health-passport",
         },
         {
           title: "Attachments",
@@ -217,6 +218,7 @@ export default function ServicesScreen() {
           description: "Manual referrals and AI-initiated guidance",
           icon: Share2,
           color: "#E91E63",
+          route: "/feature/referrals",
         },
         {
           title: "AI Digital Triage",
@@ -230,6 +232,7 @@ export default function ServicesScreen() {
           description: "Connect with healthcare providers remotely",
           icon: Stethoscope,
           color: "#E91E63",
+          route: "/feature/consult",
         },
         {
           title: "Medication Tracking",
@@ -249,12 +252,14 @@ export default function ServicesScreen() {
           description: "Adaptive, condition-aware care planning",
           icon: Target,
           color: "#E91E63",
+          route: "/feature/care-plan",
         },
         {
           title: "AI Navigator",
           description: "Ethical recommendations and guidance",
           icon: Compass,
           color: "#E91E63",
+          route: "/feature/ai-navigator",
         },
         {
           title: "Remote Patient Monitoring",
