@@ -1,357 +1,194 @@
-import React, { useCallback, useMemo, useState, forwardRef, useImperativeHandle } from "react";
-import { Alert, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, Image as RNImage, Modal, Pressable } from "react-native";
-import { Image } from "expo-image";
-import * as ImagePicker from "expo-image-picker";
-import * as Clipboard from "expo-clipboard";
-import GlassView from "@/components/GlassView";
-import { useAppSettings } from "@/providers/AppSettingsProvider";
-import { colors } from "@/constants/colors";
-import { Image as ImageIcon, Link as LinkIcon, Trash2, Plus, X, Camera } from "lucide-react-native";
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Image as RNImage, Alert, Platform } from 'react-native';
+import { Paperclip, Plus, Trash2, Image as ImageIcon, File, Link as LinkIcon } from 'lucide-react-native';
+import GlassView from '@/components/GlassView';
+import { useAppSettings } from '@/providers/AppSettingsProvider';
+import { colors } from '@/constants/colors';
 
-export type Attachment =
-  | { id: string; type: "image"; uri: string; name?: string }
-  | { id: string; type: "link"; url: string; title?: string };
-
-export type AttachmentsRef = {
-  addImage: () => Promise<void>;
-  takePhoto: () => Promise<void>;
-  startAddLink: () => void;
-};
+export type AttachmentType = 'image' | 'file' | 'link';
+export interface Attachment {
+  id: string;
+  name: string;
+  uri: string;
+  type: AttachmentType;
+}
 
 interface AttachmentsProps {
   title?: string;
-  testID?: string;
   initial?: Attachment[];
-  onChange?: (list: Attachment[]) => void;
-  allowCamera?: boolean;
+  onChange?: (items: Attachment[]) => void;
+  testID?: string;
 }
 
-const Attachments = forwardRef<AttachmentsRef, AttachmentsProps>(function Attachments(
-  { title = "Attachments", testID = "attachments", initial = [], onChange, allowCamera = true },
-  ref,
-) {
+const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'];
+
+function inferTypeFromUrl(url: string): AttachmentType {
+  const lower = url.toLowerCase();
+  const isImage = imageExts.some((ext) => lower.endsWith(ext));
+  if (isImage) return 'image';
+  try {
+    const u = new URL(url);
+    if (u.protocol.startsWith('http')) return 'link';
+  } catch {}
+  return 'file';
+}
+
+const Attachments = memo(function Attachments({ title = 'Attachments', initial, onChange, testID }: AttachmentsProps) {
   const { theme } = useAppSettings();
   const palette = colors[theme];
 
-  const [items, setItems] = useState<Attachment[]>(initial);
-  const [link, setLink] = useState<string>("");
-  const [adding, setAdding] = useState<boolean>(false);
-  const [isPicking, setIsPicking] = useState<boolean>(false);
-  const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [items, setItems] = useState<Attachment[]>(Array.isArray(initial) ? initial : []);
+  const [url, setUrl] = useState<string>('');
+  const [name, setName] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
 
-  const border = useMemo(() => ({ borderColor: `${palette.text}15` }), [palette.text]);
+  useEffect(() => {
+    setItems(Array.isArray(initial) ? initial : []);
+  }, [initial]);
 
-  const update = useCallback((next: Attachment[]) => {
-    setItems(next);
-    if (onChange) onChange(next);
-  }, [onChange]);
+  useEffect(() => {
+    onChange?.(items);
+  }, [items, onChange]);
 
-  const addImage = useCallback(async (): Promise<void> => {
-    if (isPicking) return;
-    setIsPicking(true);
+  const canAdd = useMemo(() => url.trim().length > 0, [url]);
+
+  const handleAdd = useCallback(() => {
     try {
-      console.log("[Attachments] addImage start");
-
-      if (Platform.OS === 'ios') {
-        const existing = await ImagePicker.getMediaLibraryPermissionsAsync();
-        let granted = existing.granted;
-        console.log("[Attachments] existing perm (iOS)", existing);
-        if (!granted) {
-          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          console.log("[Attachments] request perm (iOS)", perm);
-          granted = perm.granted;
-        }
-        if (!granted) {
-          Alert.alert("Permission needed", "We need access to your photos to attach images.");
-          return;
-        }
-      }
-
-      const pickerOptions: ImagePicker.ImagePickerOptions = Platform.select({
-        ios: {
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: false,
-          quality: 0.8,
-          selectionLimit: 1,
-        },
-        android: {
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: false,
-          quality: 0.8,
-        },
-        web: {
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsMultipleSelection: false,
-          quality: 0.8,
-        },
-        default: {
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: false,
-          quality: 0.8,
-        },
-      }) as ImagePicker.ImagePickerOptions;
-
-      let res: ImagePicker.ImagePickerResult;
-      try {
-        res = await ImagePicker.launchImageLibraryAsync(pickerOptions);
-      } catch (err) {
-        console.warn("[Attachments] launchImageLibraryAsync error, retrying without options", err);
-        res = await ImagePicker.launchImageLibraryAsync();
-      }
-      console.log("[Attachments] picker result", res);
-      if (res.canceled) return;
-      const asset = res.assets?.[0];
-      if (!asset?.uri) {
-        Alert.alert("Error", "No image selected.");
-        return;
-      }
-      const fileName: string | undefined = (asset as any)?.fileName ?? undefined;
-      const next: Attachment = { id: `${Date.now()}`, type: "image", uri: asset.uri, name: fileName };
-      update([next, ...items]);
-    } catch (e) {
-      console.error("[Attachments] addImage error", e);
-      Alert.alert("Error", "Could not add image. Please try again.");
-    } finally {
-      setIsPicking(false);
-    }
-  }, [isPicking, items, update]);
-
-  const takePhoto = useCallback(async (): Promise<void> => {
-    if (!allowCamera || isPicking) return;
-    setIsPicking(true);
-    try {
-      console.log("[Attachments] takePhoto start");
-      if (Platform.OS !== 'web') {
-        const camPerm = await ImagePicker.requestCameraPermissionsAsync();
-        if (!camPerm.granted) {
-          Alert.alert("Permission needed", "We need access to your camera to take photos.");
-          return;
-        }
-      }
-      const res = await ImagePicker.launchCameraAsync({
-        allowsEditing: false,
-        quality: 0.8,
-      });
-      console.log("[Attachments] camera result", res);
-      if (res.canceled) return;
-      const asset = res.assets?.[0];
-      if (!asset?.uri) {
-        Alert.alert("Error", "No photo captured.");
-        return;
-      }
-      const fileName: string | undefined = (asset as any)?.fileName ?? undefined;
-      const next: Attachment = { id: `${Date.now()}`, type: "image", uri: asset.uri, name: fileName ?? "Photo" };
-      update([next, ...items]);
-    } catch (e) {
-      console.error("[Attachments] takePhoto error", e);
-      Alert.alert("Error", "Could not take photo. Please try again.");
-    } finally {
-      setIsPicking(false);
-    }
-  }, [allowCamera, isPicking, items, update]);
-
-  const addLink = useCallback((): void => {
-    try {
-      const trimmed = link.trim();
+      const trimmed = url.trim();
       if (!trimmed) return;
-      const isValid = /^https?:\/\//i.test(trimmed);
-      if (!isValid) {
-        Alert.alert("Invalid URL", "Please enter a full URL starting with http or https.");
-        return;
-      }
-      const next: Attachment = { id: `${Date.now()}`, type: "link", url: trimmed };
-      update([next, ...items]);
-      setLink("");
-      setAdding(false);
+      const type = inferTypeFromUrl(trimmed);
+      const display = name.trim() || trimmed.split('/').pop() || 'Attachment';
+      const next: Attachment = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: display,
+        uri: trimmed,
+        type,
+      };
+      const updated = [next, ...items];
+      setItems(updated);
+      setUrl('');
+      setName('');
+      setError(null);
+      console.log('[Attachments] added', next);
     } catch (e) {
-      console.error("[Attachments] addLink error", e);
-      Alert.alert("Error", "Could not add link. Please try again.");
+      console.log('[Attachments] add error', e);
+      setError('Failed to add attachment');
     }
-  }, [items, link, update]);
+  }, [items, name, url]);
 
-  const confirmRemove = useCallback((id: string): void => {
-    Alert.alert(
-      "Remove attachment",
-      "Are you sure you want to remove this attachment?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => {
-            const next = items.filter(i => i.id !== id);
-            update(next);
-          },
-        },
-      ],
-    );
-  }, [items, update]);
-
-  const open = useCallback(async (att: Attachment): Promise<void> => {
-    if (att.type === "link") {
-      try {
-        const supported = await Linking.canOpenURL(att.url);
-        if (!supported) {
-          Alert.alert("Invalid URL", "This link cannot be opened on your device.");
-          return;
-        }
-        await Linking.openURL(att.url);
-      } catch (e) {
-        Alert.alert("Error", "Unable to open the link.");
-      }
+  const handleRemove = useCallback((id: string) => {
+    const confirm = () => {
+      const updated = items.filter((it) => it.id !== id);
+      setItems(updated);
+      console.log('[Attachments] removed', id);
+    };
+    if (Platform.OS === 'web') {
+      const ok = window.confirm('Remove this attachment?');
+      if (ok) confirm();
+    } else {
+      Alert.alert('Remove attachment', 'Are you sure you want to remove this item?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: confirm },
+      ]);
     }
-  }, []);
+  }, [items]);
 
-  useImperativeHandle(ref, () => ({
-    addImage,
-    takePhoto,
-    startAddLink: () => setAdding(true),
-  }), [addImage, takePhoto]);
-
-  return (
-    <GlassView style={styles.card} testID={testID}>
-      <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
-        <View style={styles.headerActions}>
-          {allowCamera && (
-            <TouchableOpacity onPress={takePhoto} style={[styles.iconBtn, border]} testID={`${testID}-add-camera`}>
-              <Camera size={18} color={palette.primary} />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={() => setAdding(v => !v)} style={[styles.iconBtn, border]} testID={`${testID}-add-link`}>
-            <LinkIcon size={18} color={palette.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={addImage} style={[styles.iconBtn, border]} testID={`${testID}-add-image`}>
-            <ImageIcon size={18} color={palette.primary} />
-          </TouchableOpacity>
+  const renderItem = useCallback(({ item }: { item: Attachment }) => {
+    const isImage = item.type === 'image';
+    return (
+      <View style={[styles.itemRow]}>
+        <View style={[styles.itemIcon, { backgroundColor: `${palette.primary}12` }]}> 
+          {isImage ? <ImageIcon size={18} color={palette.primary} /> : item.type === 'link' ? <LinkIcon size={18} color={palette.primary} /> : <File size={18} color={palette.primary} />}
         </View>
-      </View>
-
-      {adding && (
-        <View style={[styles.addLinkRow, { borderColor: `${palette.text}15` }]}>
-          <TextInput
-            style={[styles.input, { color: palette.text }]}
-            placeholder="Paste a URL (https://...)"
-            placeholderTextColor={palette.textSecondary}
-            value={link}
-            onChangeText={setLink}
-            autoCapitalize="none"
-            keyboardType={Platform.OS === 'web' ? 'default' : 'url'}
-            testID={`${testID}-url-input`}
-          />
-          <TouchableOpacity
-            onPress={async () => {
-              try {
-                const text = await Clipboard.getStringAsync();
-                if (text) setLink(text);
-              } catch (e) {
-                Alert.alert("Clipboard error", "Unable to access clipboard on this platform.");
-              }
-            }}
-            style={[styles.addBtn, { backgroundColor: `${palette.primary}22` }]}
-            testID={`${testID}-paste-url`}
-          >
-            <LinkIcon size={16} color={palette.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={addLink} style={[styles.addBtn, { backgroundColor: palette.primary }]} testID={`${testID}-save-url`}>
-            <Plus size={16} color={palette.background} />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {items.length === 0 ? (
-        <Text style={[styles.empty, { color: palette.textSecondary }]}>No attachments yet. Add images or paste links.</Text>
-      ) : (
-        <View style={styles.grid}>
-          {items.map((att) => (
-            <View key={att.id} style={[styles.item, border]} testID={`${testID}-item-${att.id}`}>
-              {att.type === "image" ? (
-                <Pressable onPress={() => setPreviewUri(att.uri)} onLongPress={() => confirmRemove(att.id)} testID={`${testID}-preview-${att.id}`}>
-                  {Platform.OS === 'android' ? (
-                    <RNImage source={{ uri: att.uri }} style={styles.thumb} resizeMode="cover" />
-                  ) : (
-                    <Image source={{ uri: att.uri }} style={styles.thumb} contentFit="cover" />
-                  )}
-                </Pressable>
-              ) : (
-                <Pressable style={styles.linkCell} onPress={() => open(att)} testID={`${testID}-link-${att.id}`}>
-                  <LinkIcon size={16} color={palette.primary} />
-                  <Text numberOfLines={2} style={[styles.linkText, { color: palette.text }]}>{att.url}</Text>
-                </Pressable>
-              )}
-              <View style={styles.itemFooter}>
-                <Text style={[styles.itemLabel, { color: palette.textSecondary }]} numberOfLines={1}>
-                  {att.type === "image" ? (att.name ?? "Image") : "Link"}
-                </Text>
-                <View style={styles.row}>
-                  {att.type === "link" && (
-                    <TouchableOpacity onPress={() => open(att)} style={styles.openBtn} testID={`${testID}-open-${att.id}`}>
-                      <Text style={[styles.openText, { color: palette.primary }]}>Open</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity onPress={() => confirmRemove(att.id)} accessibilityLabel="Remove attachment" testID={`${testID}-remove-${att.id}`}>
-                    <Trash2 size={16} color={palette.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          ))}
-        </View>
-      )}
-    {/* Image preview modal */}
-    <Modal
-      visible={!!previewUri}
-      animationType={Platform.OS === 'web' ? 'none' : 'fade'}
-      transparent
-      onRequestClose={() => setPreviewUri(null)}
->
-      <View style={styles.modalBackdrop}>
-        <View style={[styles.modalContent, { backgroundColor: palette.card ?? palette.background }]}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: palette.text }]}>Preview</Text>
-            <TouchableOpacity onPress={() => setPreviewUri(null)} accessibilityLabel="Close preview" testID={`${testID}-close-preview`}>
-              <X size={20} color={palette.text} />
-            </TouchableOpacity>
-          </View>
-          {previewUri ? (
-            Platform.OS === 'android' ? (
-              <RNImage source={{ uri: previewUri }} style={styles.modalImage} resizeMode="contain" />
-            ) : (
-              <Image source={{ uri: previewUri }} style={styles.modalImage} contentFit="contain" />
-            )
+        <View style={styles.itemBody}>
+          <Text style={[styles.itemTitle, { color: palette.text }]} numberOfLines={1}>{item.name}</Text>
+          <Text style={[styles.itemSub, { color: palette.textSecondary }]} numberOfLines={1}>{item.uri}</Text>
+          {isImage ? (
+            <RNImage source={{ uri: item.uri }} style={styles.preview} resizeMode="cover" />
           ) : null}
         </View>
+        <TouchableOpacity onPress={() => handleRemove(item.id)} accessibilityRole="button" testID={`remove-${item.id}`}>
+          <View style={[styles.removeBtn, { backgroundColor: `${palette.text}10`, borderColor: `${palette.text}20` }]}> 
+            <Trash2 size={16} color={palette.text} />
+          </View>
+        </TouchableOpacity>
       </View>
-    </Modal>
+    );
+  }, [handleRemove, palette.primary, palette.text, palette.textSecondary]);
+
+  return (
+    <GlassView style={styles.wrap} testID={testID}>
+      <View style={styles.headerRow}>
+        <View style={[styles.headerIcon, { backgroundColor: `${palette.primary}15` }]}> 
+          <Paperclip size={18} color={palette.primary} />
+        </View>
+        <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
+      </View>
+
+      <View style={styles.inputRow}>
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          placeholder="Name (optional)"
+          placeholderTextColor={palette.textSecondary}
+          style={[styles.input, { color: palette.text, borderColor: `${palette.text}20` }]}
+          autoCapitalize="none"
+          testID="attachment-name"
+        />
+        <TextInput
+          value={url}
+          onChangeText={(t) => {
+            setUrl(t);
+            if (error) setError(null);
+          }}
+          placeholder="Paste URL (image/file)"
+          placeholderTextColor={palette.textSecondary}
+          style={[styles.input, { color: palette.text, borderColor: `${palette.text}20` }]}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType={Platform.OS === 'web' ? 'default' : 'url'}
+          testID="attachment-url"
+        />
+        <TouchableOpacity disabled={!canAdd} onPress={handleAdd} accessibilityRole="button" testID="attachment-add">
+          <View style={[styles.addBtn, { backgroundColor: canAdd ? palette.primary : `${palette.text}20` }]}> 
+            <Plus size={18} color={palette.background} />
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {error ? <Text style={[styles.errorText, { color: palette.error ?? '#ff4d4f' }]}>{error}</Text> : null}
+
+      <FlatList
+        data={items}
+        keyExtractor={(it) => it.id}
+        renderItem={renderItem}
+        ListEmptyComponent={<Text style={[styles.emptyText, { color: palette.textSecondary }]} testID="attachments-empty">No attachments yet</Text>}
+        contentContainerStyle={items.length === 0 ? styles.emptyContainer : undefined}
+        showsVerticalScrollIndicator={false}
+        testID="attachments-list"
+      />
     </GlassView>
   );
 });
 
-export default Attachments;
-
 const styles = StyleSheet.create({
-  card: { padding: 16, borderRadius: 16, marginHorizontal: 16, marginBottom: 16 },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-  title: { fontSize: 16, fontWeight: "700" as const },
-  headerActions: { flexDirection: "row", gap: 8 } as const,
-  iconBtn: { padding: 8, borderRadius: 10, borderWidth: 1 },
-  addLinkRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, padding: 8, marginBottom: 10 },
-  input: { flex: 1, paddingHorizontal: 8, minHeight: 36 },
-  addBtn: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  empty: { fontSize: 13, lineHeight: 18 },
-  grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -6 },
-  item: { width: "48%", marginHorizontal: 6, marginBottom: 12, borderWidth: 1, borderRadius: 12, overflow: "hidden" },
-  thumb: { width: "100%", height: 110 },
-  linkCell: { flexDirection: "row", alignItems: "center", padding: 12, gap: 6 } as const,
-  linkText: { flex: 1, fontSize: 12 },
-  itemFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 10, paddingVertical: 8 },
-  itemLabel: { fontSize: 11 },
-  row: { flexDirection: "row", alignItems: "center", gap: 12 } as const,
-  openBtn: { marginRight: 6 },
-  openText: { fontSize: 12, fontWeight: "600" as const },
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", padding: 16 },
-  modalContent: { width: "100%", maxWidth: 520, borderRadius: 16, overflow: "hidden" },
-  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 10 },
-  modalTitle: { fontSize: 14, fontWeight: "700" as const },
-  modalImage: { width: "100%", height: 420, backgroundColor: "#000" },
+  wrap: { padding: 16, borderRadius: 16 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  headerIcon: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
+  title: { fontSize: 16, fontWeight: '700' as const },
+  inputRow: { flexDirection: 'row', alignItems: 'center', columnGap: 8 as unknown as number, rowGap: 8 as unknown as number, flexWrap: 'wrap', marginBottom: 8 },
+  input: { flexGrow: 1, minWidth: 140, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderRadius: 10 },
+  addBtn: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  errorText: { marginTop: 4, marginBottom: 4, fontSize: 12 },
+  emptyContainer: { paddingVertical: 16 },
+  emptyText: { textAlign: 'center', fontSize: 13 },
+  itemRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 10 },
+  itemIcon: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+  itemBody: { flex: 1 },
+  itemTitle: { fontSize: 14, fontWeight: '600' as const, marginBottom: 2 },
+  itemSub: { fontSize: 12, marginBottom: 8 },
+  preview: { width: '100%', height: 140, borderRadius: 10 },
+  removeBtn: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
 });
+
+export default Attachments;
