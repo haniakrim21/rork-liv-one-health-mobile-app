@@ -217,7 +217,18 @@ export default function DashboardScreen() {
   const handlePress = (f: DashFeature) => {
     console.log("[Dashboard] tile press", f.title);
     const slug = f.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    router.push({ pathname: "/feature/[slug]", params: { slug } });
+    const routeBySlug: Record<string, string> = {
+      booking: "/feature/booking",
+      meds: "/feature/meds",
+      triage: "/feature/triage",
+      history: "/feature/history",
+    };
+    const path = routeBySlug[slug];
+    if (path) {
+      router.push(path as any);
+    } else {
+      console.log(`[Dashboard] No route implemented for slug: ${slug}`);
+    }
   };
 
   return (
